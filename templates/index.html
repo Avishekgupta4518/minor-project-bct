@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Multi-Crop System{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="status-panel">
+        <h2>System Status</h2>
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>🔍 Disease Detection</h3>
+                <p>CNN Model Status: <span class="badge success">Ready</span></p>
+                <p>Supported Crops: {{ crops|length }}</p>
+            </div>
+            <div class="status-card">
+                <h3>📊 Yield Prediction</h3>
+                {% if yield_model_ready %}
+                    <p>LSTM Model Status: <span class="badge success">Ready</span></p>
+                    <p>Dataset: <span class="badge success">Synthetic + Live</span></p>
+                {% else %}
+                    <p>LSTM Model Status: <span class="badge warning">Not Trained</span></p>
+                    <p>Dataset: <span class="badge warning">Needs Training</span></p>
+                {% endif %}
+                <p><a href="/api/health" class="link-small">Check API Health</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="panels-grid">
+        <!-- Disease Detection Panel -->
+        <div class="panel disease-panel">
+            <h2>🍎 Disease Detection</h2>
+            <p class="panel-description">Upload a crop leaf image to detect diseases</p>
+            
+            <form id="disease-form" class="form-group">
+                <div class="form-control">
+                    <label for="crop-select">Select Crop Type:</label>
+                    <select id="crop-select" name="crop" required>
+                        <option value="">-- Choose a crop --</option>
+                        {% for crop in crops %}
+                            <option value="{{ crop }}">{{ crop|capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control">
+                    <label for="disease-image">Upload Leaf Image:</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="disease-image" name="image" accept="image/*" required>
+                        <span class="file-label">Choose Image</span>
+                    </div>
+                    <div id="image-preview" class="image-preview"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Detect Disease</button>
+            </form>
+
+            <div id="disease-result" class="result-container hidden">
+                <h3>Detection Result</h3>
+                <div class="result-content">
+                    <p><strong>Crop:</strong> <span id="result-crop"></span></p>
+                    <p><strong>Predicted Class:</strong> <span id="result-class"></span></p>
+                    <p><strong>Confidence:</strong> <span id="result-confidence"></span></p>
+                    <div id="result-probabilities" class="probabilities-chart"></div>
+                </div>
+            </div>
+
+            <div id="disease-error" class="error-message hidden"></div>
+            <div id="disease-loading" class="loading hidden">Processing image...</div>
+        </div>
+
+        <!-- Yield Prediction Panel -->
+        <div class="panel yield-panel">
+            <h2>📈 Yield Prediction</h2>
+            <p class="panel-description">Upload leaf images for multiple crops to predict yield</p>
+            
+            {% if yield_model_ready %}
+            <form id="yield-form" class="form-group">
+                <div class="crops-grid" id="crops-grid">
+                    <!-- Dynamically populated with crop upload boxes -->
+                </div>
+                <button type="submit" class="btn btn-primary">Predict Yield</button>
+            </form>
+
+            <div id="yield-result" class="result-container hidden">
+                <h3>Yield Prediction Result</h3>
+                <div class="result-content">
+                    <div class="yield-summary-grid">
+                        <div class="yield-summary-stat">
+                            <span class="summary-label">Forecast</span>
+                            <strong id="yield-trend">Healthy</strong>
+                        </div>
+                        <div class="yield-summary-stat">
+                            <span class="summary-label">Input Coverage</span>
+                            <strong id="yield-coverage">-</strong>
+                        </div>
+                    </div>
+                    <div class="yield-prediction-box">
+                        <div class="yield-value-display">
+                            <span id="result-yield" class="yield-value">0.0</span>
+                            <span class="yield-unit">tons/hectare</span>
+                        </div>
+                        <div class="yield-insights">
+                            <p id="yield-quality"></p>
+                            <div class="yield-bar">
+                                <div id="yield-bar-fill" class="yield-bar-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <strong>LSTM Model Not Ready</strong>
+                <p>The yield prediction model needs to be trained first. Please run the training script.</p>
+            </div>
+            {% endif %}
+
+            <div id="yield-error" class="error-message hidden"></div>
+            <div id="yield-loading" class="loading hidden">Processing images...</div>
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h2>ℹ️ System Information</h2>
+        <div class="info-grid">
+            <div class="info-card">
+                <h4>Supported Crops</h4>
+                <ul class="crop-list">
+                    {% for crop in crops %}
+                        <li>{{ crop|capitalize }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4>API Endpoints</h4>
+                <ul class="endpoint-list">
+                    <li><code>GET /api/health</code> - System health</li>
+                    <li><code>POST /api/detect_disease</code> - Detect disease</li>
+                    {% if yield_model_ready %}
+                        <li><code>POST /api/predict_yield</code> - Predict yield</li>
+                    {% endif %}
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4>Quick Guide</h4>
+                <ol>
+                    <li>Select a crop type</li>
+                    <li>Upload a clear leaf image</li>
+                    <li>Click to get predictions</li>
+                    <li>Review confidence scores</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize crops grid for yield prediction
+    const crops = {{ crops|safe|tojson }};
+    const initializeCropsGrid = () => {
+        const grid = document.getElementById('crops-grid');
+        if (grid) {
+            crops.forEach(crop => {
+                const div = document.createElement('div');
+                div.className = 'crop-upload-box';
+                div.innerHTML = `
+                    <label>${crop.charAt(0).toUpperCase() + crop.slice(1)}</label>
+                    <input type="file" name="${crop}" accept="image/*" class="crop-input">
+                    <div class="crop-preview"></div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+    };
+    
+    document.addEventListener('DOMContentLoaded', initializeCropsGrid);
+</script>
+{% endblock %}
