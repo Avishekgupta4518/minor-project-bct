@@ -140,6 +140,7 @@ const displayDiseaseResult = (result) => {
     result.all_probabilities.forEach((prob, idx) => {
         const probPercent = (prob * 100).toFixed(2);
         const label = result.class_labels?.[idx] || `Class ${idx}`;
+        if (label === 'Invalid') return;
         const bar = document.createElement('div');
         bar.className = 'prob-bar';
         const labelElement = document.createElement('span');
