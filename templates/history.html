@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Prediction History - Smart Multi-Crop{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h2>Prediction History</h2><p>Review saved disease and yield results.</p></div></div>
+<div class="table-panel panel">
+    {% if records %}
+    <div class="table-scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Crop</th><th>Result</th><th>Confidence</th><th>User</th></tr></thead><tbody>
+    {% for record in records %}<tr><td>{{ record['created_at'] }}</td><td>{{ record['prediction_type']|capitalize }}</td><td>{{ record['crop'] or '-' }}</td><td>{% if record['prediction_type'] == 'yield' %}{{ record['yield_prediction'] }} tons/hectare{% else %}{{ record['disease_label'] or ('Class ' ~ record['disease_class']) }}{% endif %}</td><td>{% if record['confidence'] is not none %}{{ (record['confidence'] * 100)|round(1) }}%{% else %}-{% endif %}</td><td>{{ record['name'] or 'Guest' }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}<p class="empty-state">No prediction history yet.</p>{% endif %}
+</div>
+{% endblock %}

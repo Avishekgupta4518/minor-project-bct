@@ -17,6 +17,7 @@ CORE COMPONENTS:
   ✅ LSTM Model (models/lstm_model.py)
   ✅ Feature Extraction Pipeline (utils/feature_extractor.py)
   ✅ Data Loading Utilities (utils/data_loader.py)
+  ✅ SQLite User and Prediction History Store (utils/database.py)
 
 MODELS & CHECKPOINTS:
   ✅ 14 Pre-trained CNN Checkpoints (334MB total)
@@ -40,6 +41,7 @@ API ENDPOINTS:
   ✅ GET / (homepage)
   ✅ Error Handling
   ✅ Input Validation
+  ✅ Authentication, history, analyst, and admin routes
 
 TESTING:
   ✅ Unit Tests (model loading, feature extraction)
@@ -73,12 +75,12 @@ DISEASE DETECTION: ✅ FULLY OPERATIONAL
   • Confidence scores provided
   • Probability distributions available
 
-YIELD PREDICTION: ⏳ FRAMEWORK READY
+YIELD PREDICTION: ✅ OPERATIONAL
   • LSTM architecture implemented
   • Data loading pipeline ready
   • Training script prepared (train_lstm.py)
-  • Awaiting model training
-  • Will be fully operational after training
+  • Weather-aware checkpoint trained and loaded
+  • Open-Meteo agricultural-region weather integration
 
 WEB INTERFACE: ✅ FULLY OPERATIONAL
   • Single-page responsive dashboard
@@ -178,11 +180,9 @@ KNOWN ISSUES & LIMITATIONS
    - PyTorch falls back to standard kernels
    - No functional impact
 
-2. Yield Prediction (Requires Training)
-   - LSTM model not yet trained
-   - API returns 503 until trained
-   - Training script: python train_lstm.py
-   - Expected after: train_lstm.py completes
+2. Yield Prediction Data
+  - The bundled dataset is synthetic weather/yield data for demonstration
+  - Replace data/yield_data.csv with real historical observations for production accuracy
 
 3. Device Selection (Working)
    - Automatically detects GPU
@@ -253,10 +253,8 @@ SHORT TERM (Next Few Days):
   3. Gather user feedback
 
 LONG TERM (Future Enhancements):
-  1. Implement user authentication
-  2. Add historical prediction tracking
-  3. Create admin dashboard
-  4. Set up automated model retraining
+  1. Add automated model retraining
+  2. Add production weather caching and alerts
   5. Deploy to production server (WSGI)
   6. Add mobile app
 
