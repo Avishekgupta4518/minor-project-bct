@@ -142,24 +142,22 @@ def test_api():
     except Exception as e:
         print(f"✗ Error: {e}")
     
-    # Test 6: Yield prediction (should return 503 if model not trained)
+    # Test 6: Weather-based yield prediction
     print("\n[Test 6] Yield Prediction")
     try:
-        test_img = create_test_image()
-        img_base64 = image_to_base64(test_img)
-        
         payload = {
-            "apple": img_base64,
-            "corn": img_base64,
+            "weather": {
+                "temperature": 27,
+                "rainfall": 185,
+                "humidity": 72,
+                "soil_moisture": 65,
+            }
         }
         
         response = requests.post(f"{base_url}/api/predict_yield", json=payload)
-        if response.status_code == 503:
-            print(f"✓ Correctly returned 503 - Model not trained")
-            print(f"  Message: {response.json()['error']}")
-        elif response.status_code == 200:
+        if response.status_code == 200:
             data = response.json()
-            print(f"✓ Yield prediction successful")
+            print(f"✓ Weather yield prediction successful")
             print(f"  Predicted yield: {data['yield_prediction']}")
         else:
             print(f"✗ Yield prediction failed: {response.status_code}")

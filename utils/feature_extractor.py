@@ -3,7 +3,7 @@ import torch
 from torchvision import transforms
 from PIL import Image
 
-from config import CROP_NAMES, NUM_DISEASE_CLASSES, CNN_MODEL_PATHS, DEVICE
+from config import CROP_NAMES, DISEASE_CLASS_NAMES, NUM_DISEASE_CLASSES, CNN_MODEL_PATHS, DEVICE
 from models.cnn_arch import CropCNN, GatekeeperCNN
 
 if hasattr(torch.backends, "nnpack"):
@@ -30,7 +30,7 @@ class FeatureExtractor:
         else:
             model = CropCNN(num_classes=NUM_DISEASE_CLASSES[crop_name]).to(DEVICE)
 
-        checkpoint = torch.load(model_path, map_location=DEVICE)
+        checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=True)
         model.load_state_dict(checkpoint)
         model.eval()
         self.models[crop_name] = model
@@ -87,11 +87,14 @@ class FeatureExtractor:
         confidence = confidence.item()
         predicted_class = predicted_class.item()
         probabilities = probabilities.cpu().numpy().tolist()
+        class_names = DISEASE_CLASS_NAMES[crop_name]
         
         return {
             'crop': crop_name,
             'predicted_class': predicted_class,
+            'predicted_label': class_names[predicted_class],
             'confidence': round(confidence, 4),
             'all_probabilities': probabilities,
+            'class_labels': class_names,
             'num_classes': len(probabilities)
         }

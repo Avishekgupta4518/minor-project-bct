@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Manage AI Models - Smart Multi-Crop{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h2>Manage AI Models</h2><p>Upload compatible PyTorch weights for administrator review before deployment.</p></div></div>
+<div class="panel auth-panel"><form method="post" enctype="multipart/form-data" class="form-group"><div class="form-control"><label for="model">PyTorch model</label><input id="model" name="model" type="file" accept=".pth,.pt" required></div><button class="btn btn-primary" type="submit">Upload Model</button></form></div>
+<div class="table-panel panel"><h3>Managed Files</h3>{% if files %}<ul>{% for file in files %}<li>{{ file }}</li>{% endfor %}</ul>{% else %}<p class="empty-state">No managed model files uploaded.</p>{% endif %}</div>
+{% endblock %}

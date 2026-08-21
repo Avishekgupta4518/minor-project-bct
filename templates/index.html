@@ -40,6 +40,7 @@
                         {% for crop in crops %}
                             <option value="{{ crop }}">{{ crop|capitalize }}</option>
                         {% endfor %}
+                        <option value="other">Other (not supported)</option>
                     </select>
                 </div>
 
@@ -47,7 +48,7 @@
                     <label for="disease-image">Upload Leaf Image:</label>
                     <div class="file-input-wrapper">
                         <input type="file" id="disease-image" name="image" accept="image/*" required>
-                        <span class="file-label">Choose Image</span>
+                        <label for="disease-image" class="file-label">Choose Image</label>
                     </div>
                     <div id="image-preview" class="image-preview"></div>
                 </div>
@@ -72,12 +73,40 @@
         <!-- Yield Prediction Panel -->
         <div class="panel yield-panel">
             <h2>📈 Yield Prediction</h2>
-            <p class="panel-description">Upload leaf images for multiple crops to predict yield</p>
+            <p class="panel-description">Use live weather or measured growing conditions for a forecast</p>
             
             {% if yield_model_ready %}
             <form id="yield-form" class="form-group">
-                <div class="crops-grid" id="crops-grid">
-                    <!-- Dynamically populated with crop upload boxes -->
+                <div class="location-controls">
+                    <div class="form-control">
+                        <label for="weather-location">Agricultural location</label>
+                        <select id="weather-location" required>
+                            <option value="">-- Choose a region --</option>
+                            {% for key, location in agricultural_locations.items() %}
+                                <option value="{{ key }}">{{ location.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="button" id="fetch-weather" class="btn btn-secondary">Get Live Weather</button>
+                </div>
+                <p id="weather-source" class="weather-source">Choose an agricultural region to load its live Open-Meteo forecast.</p>
+                <div class="weather-grid">
+                    <div class="form-control">
+                        <label for="weather-temperature">Temperature (C)</label>
+                        <input id="weather-temperature" type="number" min="0" max="45" step="0.0001" placeholder="e.g. 27.0000" required>
+                    </div>
+                    <div class="form-control">
+                        <label for="weather-rainfall">Rainfall (mm)</label>
+                        <input id="weather-rainfall" type="number" min="0" max="300" step="0.0001" placeholder="e.g. 185.0000" required>
+                    </div>
+                    <div class="form-control">
+                        <label for="weather-humidity">Humidity (%)</label>
+                        <input id="weather-humidity" type="number" min="0" max="100" step="0.0001" placeholder="e.g. 72.0000" required>
+                    </div>
+                    <div class="form-control">
+                        <label for="weather-soil-moisture">Soil Moisture (%)</label>
+                        <input id="weather-soil-moisture" type="number" min="0" max="100" step="0.0001" placeholder="e.g. 65.0000" required>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">Predict Yield</button>
             </form>
@@ -102,6 +131,7 @@
                         </div>
                         <div class="yield-insights">
                             <p id="yield-quality"></p>
+                            <p id="yield-explanation" class="yield-explanation"></p>
                             <div class="yield-bar">
                                 <div id="yield-bar-fill" class="yield-bar-fill"></div>
                             </div>
@@ -158,26 +188,3 @@
 
 {% endblock %}
 
-{% block extra_js %}
-<script>
-    // Initialize crops grid for yield prediction
-    const crops = {{ crops|safe|tojson }};
-    const initializeCropsGrid = () => {
-        const grid = document.getElementById('crops-grid');
-        if (grid) {
-            crops.forEach(crop => {
-                const div = document.createElement('div');
-                div.className = 'crop-upload-box';
-                div.innerHTML = `
-                    <label>${crop.charAt(0).toUpperCase() + crop.slice(1)}</label>
-                    <input type="file" name="${crop}" accept="image/*" class="crop-input">
-                    <div class="crop-preview"></div>
-                `;
-                grid.appendChild(div);
-            });
-        }
-    };
-    
-    document.addEventListener('DOMContentLoaded', initializeCropsGrid);
-</script>
-{% endblock %}

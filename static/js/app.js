@@ -23,6 +23,8 @@ const hideError = (id) => {
     hideElement(id);
 };
 
+const toFourDecimals = (value) => Number(Number(value).toFixed(4));
+
 // File input preview
 const setupFilePreview = () => {
     const diseaseInput = document.getElementById('disease-image');
@@ -90,6 +92,9 @@ const setupDiseaseDetection = () => {
             if (!crop || !file) {
                 throw new Error('Please select a crop and upload an image');
             }
+            if (crop === 'other') {
+                throw new Error('Other crops are not supported by the trained disease models yet.');
+            }
 
             const imageBase64 = await fileToBase64(file);
 
@@ -124,26 +129,34 @@ const setupDiseaseDetection = () => {
 // Display disease detection results
 const displayDiseaseResult = (result) => {
     document.getElementById('result-crop').textContent = result.crop.toUpperCase();
-    document.getElementById('result-class').textContent = `Class ${result.predicted_class}`;
+    document.getElementById('result-class').textContent = result.predicted_label || `Class ${result.predicted_class}`;
     document.getElementById('result-confidence').textContent = 
         `${(result.confidence * 100).toFixed(2)}%`;
 
     // Display probability bars
     const probDiv = document.getElementById('result-probabilities');
-    probDiv.innerHTML = '';
-    
+    probDiv.replaceChildren();
+
     result.all_probabilities.forEach((prob, idx) => {
         const probPercent = (prob * 100).toFixed(2);
-        const barHTML = `
-            <div class="prob-bar">
-                <span class="prob-label">Class ${idx}</span>
-                <div class="prob-container">
-                    <div class="prob-bar-fill" style="width: ${probPercent}%"></div>
-                </div>
-                <span class="prob-value">${probPercent}%</span>
-            </div>
-        `;
-        probDiv.innerHTML += barHTML;
+        const label = result.class_labels?.[idx] || `Class ${idx}`;
+        if (label === 'Invalid') return;
+        const bar = document.createElement('div');
+        bar.className = 'prob-bar';
+        const labelElement = document.createElement('span');
+        labelElement.className = 'prob-label';
+        labelElement.textContent = label;
+        const container = document.createElement('div');
+        container.className = 'prob-container';
+        const fill = document.createElement('div');
+        fill.className = 'prob-bar-fill';
+        fill.style.width = `${probPercent}%`;
+        const value = document.createElement('span');
+        value.className = 'prob-value';
+        value.textContent = `${probPercent}%`;
+        container.appendChild(fill);
+        bar.append(labelElement, container, value);
+        probDiv.appendChild(bar);
     });
 
     showElement('disease-result');
@@ -154,6 +167,40 @@ const setupYieldPrediction = () => {
     const form = document.getElementById('yield-form');
     if (!form) return;
 
+    let weatherSequence = null;
+    const weatherInputs = form.querySelectorAll('.weather-grid input');
+    const weatherSource = document.getElementById('weather-source');
+
+    weatherInputs.forEach(input => input.addEventListener('input', () => {
+        weatherSequence = null;
+        weatherSource.textContent = 'Using manually entered weather conditions.';
+    }));
+
+    document.getElementById('fetch-weather').addEventListener('click', async () => {
+        const place = document.getElementById('weather-location').value;
+        if (place === '') {
+            showError('yield-error', 'Choose an agricultural region before getting live weather.');
+            return;
+        }
+
+        try {
+            hideError('yield-error');
+            const response = await fetch(`/api/weather?place=${encodeURIComponent(place)}`);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Live weather lookup failed');
+
+            weatherSequence = result.sequence;
+            const current = weatherSequence[0];
+            document.getElementById('weather-temperature').value = toFourDecimals(current.temperature).toFixed(4);
+            document.getElementById('weather-rainfall').value = toFourDecimals(current.rainfall).toFixed(4);
+            document.getElementById('weather-humidity').value = toFourDecimals(current.humidity).toFixed(4);
+            document.getElementById('weather-soil-moisture').value = toFourDecimals(current.soil_moisture).toFixed(4);
+            weatherSource.textContent = `Live 12-step forecast loaded for ${result.location} from Open-Meteo.`;
+        } catch (error) {
+            showError('yield-error', error.message);
+        }
+    });
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideError('yield-error');
@@ -161,28 +208,32 @@ const setupYieldPrediction = () => {
         showElement('yield-loading');
 
         try {
-            const imageData = {};
-            const cropInputs = document.querySelectorAll('.crop-input');
-
-            for (const input of cropInputs) {
-                const crop = input.name;
-                const file = input.files[0];
-                if (file) {
-                    const imageBase64 = await fileToBase64(file);
-                    imageData[crop] = imageBase64;
-                }
+            const rawWeather = {
+                temperature: document.getElementById('weather-temperature').value,
+                rainfall: document.getElementById('weather-rainfall').value,
+                humidity: document.getElementById('weather-humidity').value,
+                soil_moisture: document.getElementById('weather-soil-moisture').value,
+            };
+            if (Object.values(rawWeather).some(value => value === '')) {
+                throw new Error('Enter all weather values or load a live agricultural-region forecast.');
             }
 
-            if (Object.keys(imageData).length === 0) {
-                throw new Error('Please upload at least one crop image');
-            }
+            const weather = {
+                temperature: Number(rawWeather.temperature),
+                rainfall: Number(rawWeather.rainfall),
+                humidity: Number(rawWeather.humidity),
+                soil_moisture: Number(rawWeather.soil_moisture),
+            };
 
+            const payload = weatherSequence
+                ? { weather_sequence: weatherSequence }
+                : { weather };
             const response = await fetch('/api/predict_yield', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(imageData)
+                body: JSON.stringify(payload)
             });
 
             hideElement('yield-loading');
@@ -215,7 +266,7 @@ const displayYieldResult = (result) => {
 
     document.getElementById('result-yield').textContent = yieldValue.toFixed(2);
     document.getElementById('yield-trend').textContent = trendText;
-    document.getElementById('yield-coverage').textContent = `${Math.min(100, Math.round((yieldValue / 7.0) * 100))}%`;
+    document.getElementById('yield-coverage').textContent = result.sequence_length === 12 ? '12 weather steps' : 'Manual input';
 
     let qualityText = '';
     if (yieldValue >= 6.0) {
@@ -229,6 +280,15 @@ const displayYieldResult = (result) => {
     }
 
     document.getElementById('yield-quality').textContent = qualityText;
+
+    const explanation = yieldValue >= 6.0
+        ? `The model estimates about ${yieldValue.toFixed(2)} tons of harvest per hectare under these conditions. This is a favorable forecast, so continue monitoring water, pests, and crop health.`
+        : yieldValue >= 5.0
+            ? `The model estimates about ${yieldValue.toFixed(2)} tons of harvest per hectare. Conditions look usable, but better irrigation, nutrition, and disease monitoring may improve the harvest.`
+            : yieldValue >= 4.0
+                ? `The model estimates about ${yieldValue.toFixed(2)} tons of harvest per hectare. Review rainfall, soil moisture, temperature stress, and crop disease risks before making decisions.`
+                : `The model estimates about ${yieldValue.toFixed(2)} tons of harvest per hectare. Treat this as a warning to inspect the field and address water, soil, temperature, or disease problems.`;
+    document.getElementById('yield-explanation').textContent = `${explanation} The estimate is a decision-support forecast, not a guaranteed harvest. It uses ${result.sequence_length === 12 ? '12 weather steps' : 'the entered weather values'} and should be compared with local field records.`;
 
     const maxYield = 7.0;
     const percentage = Math.min((yieldValue / maxYield) * 100, 100);

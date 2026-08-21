@@ -6,22 +6,23 @@ from pathlib import Path
 from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader
 
-from config import CROP_NAMES, DEVICE, LSTM_MODEL_PATH
+from config import DEVICE, WEATHER_FEATURES, WEATHER_LSTM_MODEL_PATH
 from generate_synthetic_yield_data import ensure_dataset
 from models.lstm_model import YieldLSTM
 from utils.data_loader import YieldDataset
-from utils.feature_extractor import FeatureExtractor
+
+RANDOM_SEED = 42
+torch.manual_seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(RANDOM_SEED)
 
 # Make sure the yield dataset is present before training.
 ensure_dataset(min_rows=120)
 
-# Initialize feature extractor
-feature_extractor = FeatureExtractor()
-
 base_dir = Path(__file__).resolve().parent
 csv_file = base_dir / "data" / "yield_data.csv"
-image_dir = base_dir / "data" / "images"
-dataset = YieldDataset(csv_file, image_dir, feature_extractor)
+dataset = YieldDataset(csv_file)
 
 dataset_size = len(dataset)
 if dataset_size < 2:
@@ -31,12 +32,15 @@ if dataset_size < 2:
 
 train_size = int(0.8 * dataset_size)
 val_size = dataset_size - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+split_generator = torch.Generator().manual_seed(RANDOM_SEED)
+train_dataset, val_dataset = torch.utils.data.random_split(
+    dataset, [train_size, val_size], generator=split_generator
+)
 
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
 
-model = YieldLSTM(input_size=256, hidden_size=128, num_layers=2).to(DEVICE)
+model = YieldLSTM(input_size=len(WEATHER_FEATURES), hidden_size=64, num_layers=2).to(DEVICE)
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
@@ -72,15 +76,21 @@ for epoch in range(1, 81):
     val_loss /= len(val_dataset)
     rmse = np.sqrt(mean_squared_error(val_targets, val_preds))
     r2 = r2_score(val_targets, val_preds)
+    baseline_preds = np.full(len(val_targets), np.mean(val_targets))
+    baseline_rmse = np.sqrt(mean_squared_error(val_targets, baseline_preds))
 
-    print(f"Epoch {epoch:2d} | Train Loss: {train_loss/len(train_dataset):.6f} | Val Loss: {val_loss:.6f} | RMSE: {rmse:.4f} | R²: {r2:.4f}")
+    print(
+        f"Epoch {epoch:2d} | Train Loss: {train_loss/len(train_dataset):.6f} "
+        f"| Val Loss: {val_loss:.6f} | RMSE: {rmse:.4f} "
+        f"| Baseline RMSE: {baseline_rmse:.4f} | R²: {r2:.4f}"
+    )
 
     scheduler.step(val_loss)
 
     if rmse < best_rmse:
         best_rmse = rmse
         patience_counter = 0
-        torch.save(model.state_dict(), LSTM_MODEL_PATH)
+        torch.save(model.state_dict(), WEATHER_LSTM_MODEL_PATH)
         print("   -> New best model saved.")
     else:
         patience_counter += 1
@@ -89,4 +99,4 @@ for epoch in range(1, 81):
             break
 
 print(f"Training complete. Best validation RMSE: {best_rmse:.4f}")
-print(f"Model saved to: {LSTM_MODEL_PATH}")
+print(f"Model saved to: {WEATHER_LSTM_MODEL_PATH}")
