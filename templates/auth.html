@@ -7,6 +7,7 @@
         {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
     {% endwith %}
     <form method="post" class="form-group">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% if mode == 'register' %}
         <div class="form-control"><label for="name">Name</label><input id="name" name="name" required></div>
         {% endif %}

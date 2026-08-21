@@ -106,6 +106,14 @@ CNN_MODEL_DIR = BASE_DIR / "models" / "cnn_models"
 
 LSTM_MODEL_PATH = BASE_DIR / "models" / "lstm_yield.pth"
 WEATHER_LSTM_MODEL_PATH = BASE_DIR / "models" / "weather_lstm_yield.pth"
+SPATIAL_LSTM_MODEL_PATH = BASE_DIR / "models" / "spatial_paddy_lstm_final.pth"
+BUDDY_MODEL_PATH = BASE_DIR / "models" / "buddy_fusion.pth"
+
+SPATIAL_LSTM_INPUT_SIZE = 33
+SPATIAL_LSTM_HIDDEN_SIZE = 128
+SPATIAL_LSTM_NUM_LAYERS = 2
+BUDDY_INPUT_SIZE = 12
+YIELD_RANGE = (2.0, 8.5)
 
 WEATHER_FEATURES = [
     "temperature",
