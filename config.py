@@ -124,7 +124,11 @@ WEATHER_RANGES = {
 AGRICULTURAL_LOCATIONS = {
     "kathmandu": {"name": "Kathmandu Valley", "latitude": 27.7172, "longitude": 85.3240},
     "chitwan": {"name": "Chitwan", "latitude": 27.5291, "longitude": 84.3542},
-    "jhapa": {"name": "Jhapa", "latitude": 26.5455, "longitude": 87.8942},
+    'jhapa': {
+        'name': 'Jhapa, Nepal',
+        'latitude': 26.55,
+        'longitude': 87.95,
+    },
     "morang": {"name": "Morang", "latitude": 26.6636, "longitude": 87.4542},
     "rupandehi": {"name": "Rupandehi", "latitude": 27.5065, "longitude": 83.4470},
     "banke": {"name": "Banke", "latitude": 28.0500, "longitude": 81.6167},

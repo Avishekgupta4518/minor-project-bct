@@ -243,7 +243,7 @@ def weather():
     place_key = request.args.get('place', '').lower()
     location = AGRICULTURAL_LOCATIONS.get(place_key)
     if not location:
-        return jsonify({'error': 'Choose a supported agricultural location.'}), 400
+        return jsonify({'error': f'Location "{place_key}" not supported. Choose from: {list(AGRICULTURAL_LOCATIONS.keys())}'}), 400
 
     latitude = location['latitude']
     longitude = location['longitude']
@@ -255,33 +255,48 @@ def weather():
         'forecast_days': 2,
         'timezone': 'auto',
     })
+    url = f'https://api.open-meteo.com/v1/forecast?{query}'
+
     try:
-        with urlopen(f'https://api.open-meteo.com/v1/forecast?{query}', timeout=10) as response:
+        with urlopen(url, timeout=15) as response:
             payload = json.load(response)
-    except Exception as error:
-        return jsonify({'error': f'Weather service unavailable: {error}'}), 502
+    except TimeoutError as te:
+        app.logger.error(f"Weather API timeout for {place_key}: {te}")
+        return jsonify({'error': 'Weather service timed out. Please try again later.'}), 503
+    except ConnectionError as ce:
+        app.logger.error(f"Weather API connection error for {place_key}: {ce}")
+        return jsonify({'error': 'Could not connect to weather service. Check your network.'}), 503
+    except Exception as e:
+        app.logger.error(f"Unexpected error fetching weather for {place_key}: {e}")
+        return jsonify({'error': f'Weather service unavailable: {str(e)}'}), 503
 
     hourly = payload.get('hourly', {})
-    sequences = {
-        'temperature': hourly.get('temperature_2m', []),
-        'rainfall': hourly.get('precipitation', []),
-        'humidity': hourly.get('relative_humidity_2m', []),
-        'soil_moisture': [
-            min(100.0, humidity * 0.55 + rainfall * 4.0)
-            for humidity, rainfall in zip(
-                hourly.get('relative_humidity_2m', []),
-                hourly.get('precipitation', []),
-            )
-        ],
-    }
-    if any(len(values) < WEATHER_SEQUENCE_LENGTH for values in sequences.values()):
-        return jsonify({'error': 'Weather service returned an incomplete forecast.'}), 502
+    temp = hourly.get('temperature_2m', [])
+    precip = hourly.get('precipitation', [])
+    humidity = hourly.get('relative_humidity_2m', [])
 
-    sequence = [
-        {feature: round(sequences[feature][index], 4) for feature in WEATHER_FEATURES}
-        for index in range(WEATHER_SEQUENCE_LENGTH)
-    ]
-    return jsonify({'sequence': sequence, 'source': 'Open-Meteo', 'location': location['name']}), 200
+    # Ensure we have at least WEATHER_SEQUENCE_LENGTH readings
+    if len(temp) < WEATHER_SEQUENCE_LENGTH or len(precip) < WEATHER_SEQUENCE_LENGTH or len(humidity) < WEATHER_SEQUENCE_LENGTH:
+        app.logger.warning(f"Incomplete weather data for {place_key}: temp={len(temp)}, precip={len(precip)}, humidity={len(humidity)}")
+        return jsonify({'error': 'Incomplete forecast data from weather service.'}), 503
+
+    # Build the sequence
+    sequence = []
+    for i in range(WEATHER_SEQUENCE_LENGTH):
+        step = {
+            'temperature': round(temp[i], 2),
+            'rainfall': round(precip[i], 2),
+            'humidity': round(humidity[i], 2),
+            'soil_moisture': round(min(100.0, humidity[i] * 0.55 + precip[i] * 4.0), 2),
+        }
+        sequence.append(step)
+
+    return jsonify({
+        'sequence': sequence,
+        'source': 'Open-Meteo',
+        'location': location['name'],
+        'length': WEATHER_SEQUENCE_LENGTH,
+    }), 200
 
 @app.route('/api/detect_disease', methods=['POST'])
 def detect_disease():
