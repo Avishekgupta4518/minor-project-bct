@@ -26,6 +26,7 @@ models/managed/
 Thumbs.db
 .vscode/
 .idea/
+.cursor/
 
 # Test / coverage
 .pytest_cache/
