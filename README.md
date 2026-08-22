@@ -1,379 +1,316 @@
-# Smart Multi-Crop Disease Detection and Yield Prediction
+# Field Companion — Smart Multi-Crop Disease Detection & Yield Prediction
 
-A web-based AI system for detecting crop diseases from leaf images using CNN and predicting crop yield using LSTM networks.
+An AI-based agricultural decision-support web app for farmers in Nepal. It combines:
+
+1. **Disease Detection** — a two-stage CNN pipeline reads a leaf photo and classifies disease.
+2. **Yield Prediction** — a Spatial LSTM reads a 12-step weather forecast and predicts crop yield.
+3. **Buddy Fusion** — a small fusion network joins the disease-detection result with the weather-only
+   yield forecast, so a sick plant lowers the predicted harvest and a healthy one supports it.
+
+Farmers get one combined result instead of two disconnected numbers. Analysts and admins get
+history, analytics, and dataset/model management on top of the same system.
+
+> **Status note:** this README reflects what is actually implemented in the codebase today,
+> replacing the earlier `PROJECT_SUMMARY.md` / `DEPLOYMENT_READY.txt` / `IMPLEMENTATION_STATUS.md`
+> files, which have been retired in favor of this single document.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph Disease Detection
+        A[Leaf photo] --> B[Gatekeeper CNN\nEfficientNet-B0\nspecies gate]
+        B --> C[Species CNN\nCropCNN, per crop]
+        C --> D[Disease label + confidence]
+    end
+
+    subgraph Yield Prediction
+        E[12-step weather forecast\nOpen-Meteo or manual entry] --> F[Spatial LSTM\n33 features/step]
+        F --> G[Weather-only yield]
+    end
+
+    D --> H[Buddy Fusion Net]
+    G --> H
+    H --> I[Fused yield prediction]
+
+    D --> J[(SQLite:\nprediction_history)]
+    I --> J
+    J --> K[History / Analyst / Admin views]
+```
+
+- **Gatekeeper CNN** (EfficientNet-B0, `timm`): identifies the crop species from the photo.
+- **Species CNN** (`CropCNN`, custom 3-layer conv net): classifies the specific disease within
+  that species (10–14 classes per crop; 13 species use `CropCNN`, `gatekeeper` uses the
+  EfficientNet path directly).
+- **Spatial LSTM** (`SpatialPaddyLSTM`): consumes a 12-step weather sequence enriched with
+  location, crop, and (if available) plant-health signals — 33 features per step — and predicts
+  a weather-only yield.
+- **Buddy Fusion Net** (`BuddyFusionNet`): a small MLP that takes the LSTM's yield estimate plus
+  plant-health signals from the disease model and produces the final fused yield shown to the
+  farmer, along with a plain-language relationship label (e.g. "disease reduces yield").
+
+This is different from the original SRS/DFD diagrams from the lab documents, which described a
+single CNN and a plain weather LSTM with no fusion step — see `PROJECT_CONTEXT.md` for that
+original spec, now superseded by the above.
+
+---
 
 ## Features
 
-✅ **Disease Detection**: CNN-based classification of crop diseases from leaf images
-✅ **Multi-Crop Support**: 14 different crops (apple, blueberry, cherry, corn, gatekeeper, grape, orange, peach, pepper, potato, raspberry, soybean, strawberry, tomato)
-✅ **Yield Prediction**: Weather-based LSTM time-series forecasting
-✅ **Web Interface**: User-friendly dashboard for predictions and analytics
-✅ **REST API**: JSON endpoints for programmatic access
-✅ **Mobile Responsive**: Works on desktop, tablet, and mobile devices
-✅ **Authentication**: Farmer registration, login, logout, and role-aware access
-✅ **Prediction History**: SQLite-backed disease and yield prediction records
-✅ **Analyst/Admin Views**: History analysis and admin user-role management
+- **Disease detection** — CNN-based classification from leaf photos, 14 crops.
+- **Yield prediction** — Spatial LSTM + Buddy Fusion, using live or manually entered weather.
+- **Web dashboard** — responsive, mobile-friendly single-page interface.
+- **REST API** — JSON endpoints for programmatic access.
+- **Authentication** — farmer registration/login/logout with session-based auth.
+- **Roles** — farmer, analyst, admin, each with scoped views.
+- **Prediction history** — SQLite-backed disease and yield records per user.
+- **Analyst view** — read access to all prediction history.
+- **Admin tools** — user role management, dataset upload (staged, not auto-activated),
+  model upload (staged, not auto-activated), and summary analytics.
+- **Live weather** — pulls a 12-step forecast from Open-Meteo for supported Nepali agricultural
+  regions (Kathmandu Valley, Chitwan, Jhapa, Morang, Rupandehi, Banke, Dang, Kailali, Bara,
+  Kaski, and more — see `config.py` for the full list).
 
-## System Architecture
+## Current Status
+
+| Component | Status |
+|---|---|
+| Disease detection (Gatekeeper + species CNNs) | Working — 14 crop checkpoints load and run inference |
+| Spatial LSTM (weather-only yield) | Working — checkpoint present, trained on synthetic data |
+| Buddy Fusion (disease + weather) | Working — checkpoint present, trained on synthetic data |
+| Auth, roles, history, admin | Working |
+| CSRF protection | Enforced on all non-GET requests (see Security section) |
+| Real historical yield data | **Not yet supplied** — bundled `data/yield_data.csv` is synthetic |
+| Automated tests | Partial — see `tests/` and `test_app.py`; DB/security/route layers not yet covered |
+
+---
+
+## Project Structure
 
 ```
 project/
-├── app.py                    # Flask web application
-├── config.py                 # Configuration and constants
-├── train_lstm.py             # LSTM training script
-├── requirements.txt          # Python dependencies
-├── data/
-│   └── yield_data.csv        # Historical yield data for LSTM training
+├── app.py                          # Flask application, routes, auth
+├── config.py                       # Crop names, disease classes, model paths, weather config
+├── create_admin.py                 # CLI to create an admin account
+├── generate_synthetic_yield_data.py# Synthetic weather/yield dataset generator
+├── train_lstm.py                   # (Legacy) plain weather LSTM training script
+├── train_buddy.py                  # Buddy fusion network training script
+├── requirements.txt
+├── start.sh
+├── test_app.py                     # Smoke-test script (live server)
 ├── models/
-│   ├── cnn_arch.py          # CNN model architectures (CropCNN, GatekeeperCNN)
-│   ├── lstm_model.py        # LSTM model for yield prediction
-│   └── cnn_models/          # Pre-trained CNN checkpoints
-│       ├── apple.pth
-│       ├── blueberry.pth
-│       ├── ... (other crop models)
-│       └── gatekeeper.pth
+│   ├── cnn_arch.py                 # CropCNN, GatekeeperCNN
+│   ├── lstm_model.py               # YieldLSTM, SpatialPaddyLSTM, BuddyFusionNet
+│   ├── cnn_models/*.pth            # 14 trained disease-detection checkpoints
+│   ├── spatial_paddy_lstm_final.pth# Trained Spatial LSTM checkpoint
+│   └── buddy_fusion.pth            # Trained Buddy Fusion checkpoint
 ├── utils/
-│   ├── data_loader.py       # Data loading utilities
-│   ├── feature_extractor.py # CNN feature extraction for inference
-├── static/
-│   ├── css/style.css        # UI styling
-│   └── js/app.js            # Frontend interactivity
-├── templates/
-│   ├── base.html            # Base template
-│   └── index.html           # Dashboard template
-└── test_app.py              # API testing script
+│   ├── database.py                 # SQLite users + prediction_history
+│   ├── security.py                 # CSRF, rate limiting, image validation
+│   ├── feature_extractor.py        # Disease-detection inference
+│   ├── spatial_features.py         # Feature engineering for the Spatial LSTM / Buddy net
+│   ├── yield_pipeline.py           # Orchestrates LSTM + Buddy inference
+│   └── data_loader.py              # Legacy YieldDataset for train_lstm.py
+├── static/{css,js}/                # Frontend assets
+├── templates/                      # Jinja2 templates (dashboard, auth, admin, history)
+└── tests/                          # pytest unit tests (spatial features, lazy loading)
 ```
+
+---
 
 ## Installation
 
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+### Linux / macOS
 
-### 2. Run the Application
 ```bash
+git clone <repo-url>
+cd minor-project-bct
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 python app.py
 ```
 
-The application will start on `http://localhost:5000`
-
-## Run Everything on Windows
-
-From PowerShell, run these commands from the project folder:
+### Windows (PowerShell)
 
 ```powershell
-cd C:\Users\Fix\Desktop\minor_project_bct\minor-project-bct
+git clone <repo-url>
+cd minor-project-bct
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://localhost:5000` in a browser. The trained weather LSTM checkpoint is already in `models/weather_lstm_yield.pth`.
+Open `http://localhost:5000` in a browser.
 
-Create an administrator account in a second PowerShell window:
+### Create an admin account
 
-```powershell
-cd C:\Users\Fix\Desktop\minor_project_bct\minor-project-bct
-.\.venv\Scripts\Activate.ps1
+```bash
 python create_admin.py
 ```
 
-The application supports these workflows:
+### Run the smoke test (while the app is running)
 
-- Farmer: choose **Sign in**, create an account, run disease and yield predictions, then open **History**.
-- Live yield weather: choose an agricultural region, click **Get Live Weather**, then click **Predict Yield**.
-- Analyst: an administrator can change a farmer's role to `analyst`; the analyst can open **Analyst** and view all prediction results.
-- Administrator: sign in to open **Admin**, **Dataset**, or **Models**. Uploaded datasets and model files are staged for review and are not activated automatically.
-
-Run the smoke test in another terminal while the app is running:
-
-```powershell
+```bash
 python test_app.py
 ```
 
-Retrain the weather LSTM only when replacing the bundled dataset with real historical data:
+### Run the unit tests
 
-```powershell
-python train_lstm.py
-```
-
-## API Endpoints
-
-### Health Check
 ```bash
-GET /api/health
-```
-Returns system status and available crops.
-
-### Authentication and History
-
-- `GET/POST /register` creates a farmer account.
-- `GET/POST /login` starts a session.
-- `GET /logout` ends the session.
-- `GET /history` shows a farmer's saved predictions; analysts and admins can review all saved results.
-- `GET /analyst` opens the analyst history view.
-- `GET /admin` opens system monitoring and user-role management for administrators.
-
-Prediction history is stored in `data/smart_agriculture.db`. Set `DATABASE_PATH` to use another SQLite database and set `SECRET_KEY` in production.
-
-### Disease Detection
-```bash
-POST /api/detect_disease
-Content-Type: application/json
-
-{
-  "crop": "apple",
-  "image": "<base64_encoded_image>"
-}
+pip install pytest
+pytest tests/
 ```
 
-**Response (200 OK):**
+---
+
+## Workflows
+
+- **Farmer**: Sign in → scan a leaf → (optionally) load live weather for a region → predict
+  yield → view the combined result → check **History** for past predictions.
+- **Analyst**: An admin promotes a farmer's role to `analyst`; the analyst can open **Analyst**
+  to review all prediction history.
+- **Admin**: Sign in → **Admin** for user/role management and system counts, **Dataset** to
+  stage a new CSV for review, **Models** to stage a new `.pth`/`.pt` checkpoint for review.
+  Staged files are **not** activated automatically.
+
+---
+
+## API Reference
+
+### `GET /api/health`
+Returns system status, device (CPU/GPU), and supported crops.
+
+### `GET /api/weather?place=<region_key>`
+Returns a 12-step weather forecast from Open-Meteo for a supported region (see `config.py` →
+`AGRICULTURAL_LOCATIONS` for valid keys).
+
+### `POST /api/detect_disease`
+```json
+{ "crop": "apple", "image": "<base64_encoded_image>" }
+```
+**200 OK**
 ```json
 {
   "crop": "apple",
   "predicted_class": 3,
   "predicted_label": "Apple__healthy",
   "confidence": 0.9145,
-  "class_labels": ["Apple__Apple_scab", "Apple_Black_rot", "Apple_Cedar_apple_rust", "Apple__healthy", "Invalid", "Invalid", "Invalid", "Invalid", "Invalid", "Invalid"],
-  "all_probabilities": [0.02, 0.05, 0.03, 0.91, ...],
+  "class_labels": ["Apple__Apple_scab", "Apple_Black_rot", "Apple_Cedar_apple_rust", "Apple__healthy", "..."],
+  "all_probabilities": [0.02, 0.05, 0.03, 0.91],
   "num_classes": 10
 }
 ```
 
-### Yield Prediction
-```bash
-POST /api/predict_yield
-Content-Type: application/json
-
-{
-  "weather": {
-    "temperature": 27,
-    "rainfall": 185,
-    "humidity": 72,
-    "soil_moisture": 65
-  }
-}
-```
-
-**Response (200 OK):**
+### `POST /api/predict_yield`
 ```json
 {
-  "yield_prediction": 8.52,
-  "sequence_length": 12,
-  "weather_features": ["temperature", "rainfall", "humidity", "soil_moisture"]
+  "weather": { "temperature": 27, "rainfall": 185, "humidity": 72, "soil_moisture": 65 },
+  "crop": "apple",
+  "place": "chitwan",
+  "disease": { "crop": "apple", "predicted_class": 3, "predicted_label": "Apple__healthy", "confidence": 0.91, "num_classes": 10 }
+}
+```
+Accepts either a single `weather` object (repeated across all 12 steps) or a full
+`weather_sequence` array of 12 objects (as returned by `/api/weather`).
+
+**200 OK**
+```json
+{
+  "lstm_yield": 6.1,
+  "fused_yield": 6.4,
+  "yield_prediction": 6.4,
+  "adjustment": 0.3,
+  "relationship": "plant_supports_weather",
+  "sequence_length": 12
 }
 ```
 
-Use `/api/weather?place=chitwan` to retrieve a live 12-step forecast from Open-Meteo. Available agricultural regions include Kathmandu Valley, Chitwan, Jhapa, Morang, Rupandehi, Banke, Dang, Kailali, Bara, and Kaski. The frontend includes this live-weather flow and also supports manually measured weather values.
+### Authentication & History
+- `GET/POST /register`, `GET/POST /login`, `GET /logout`
+- `GET /history` — farmer's own predictions; analyst/admin see all
+- `GET /analyst` — analyst-only history view
+- `GET /admin`, `GET/POST /admin/dataset`, `GET/POST /admin/models` — admin only
+- `GET /api/analytics` — analyst/admin only, JSON summary
 
-The disease selector includes an `Other (not supported)` option. It intentionally does not run an unrelated crop model when a trained model is unavailable.
-
-## Testing
-
-Run the comprehensive test suite:
-```bash
-python test_app.py
-```
-
-This tests:
-- Health check endpoint
-- Homepage loading
-- Disease detection (multiple crops)
-- Invalid input handling
-- Yield prediction endpoint
-
-## Model Details
-
-### CNN Models (Disease Detection)
-
-**CropCNN** (for 13 crops):
-- Architecture: 3-layer convolutional network
-- Input: 224×224 RGB images
-- Output: 10 disease classes
-- Output features: 256-dimensional
-
-**GatekeeperCNN** (special crop):
-- Architecture: EfficientNet-B0
-- Input: 224×224 RGB images
-- Output: 14 disease classes
-- Output features: 256-dimensional
-
-### LSTM Model (Yield Prediction)
-
-**YieldLSTM**:
-- Input: Sequence of 12 weather steps with temperature, rainfall, humidity, and soil moisture
-- Architecture: 2-layer LSTM with hidden size 64
-- Output: Single yield prediction value
-- Training data: `data/yield_data.csv` weather history and yield target
-
-## Training the LSTM Model
-
-To train the yield prediction model:
-
-```bash
-python train_lstm.py
-```
-
-**Requirements:**
-- Historical yield data in `data/yield_data.csv`
-- CSV should contain 12 monthly values for `temperature`, `rainfall`, `humidity`, and `soil_moisture`, plus `yield`
-- Training data will be used to fine-tune the LSTM
-
-The bundled demonstration data is synthetic and intentionally includes climate variation. Its current target range is approximately 5.93 to 7.61 tons/hectare. Training prints both validation RMSE and a mean-yield baseline; the LSTM should be compared against that baseline rather than judged from R-squared alone.
-
-## Configuration
-
-Edit `config.py` to modify:
-- Device (CPU/GPU)
-- Model paths
-- Number of disease classes per crop
-- Image size (224×224)
-
-## Supported Crops
-
-| ID | Crop | Disease Classes |
-|----|------|-----------------|
-| 1 | Apple | 10 |
-| 2 | Blueberry | 10 |
-| 3 | Cherry | 10 |
-| 4 | Corn | 10 |
-| 5 | Gatekeeper* | 14 |
-| 6 | Grape | 10 |
-| 7 | Orange | 10 |
-| 8 | Peach | 10 |
-| 9 | Pepper | 10 |
-| 10 | Potato | 10 |
-| 11 | Raspberry | 10 |
-| 12 | Soybean | 10 |
-| 13 | Strawberry | 10 |
-| 14 | Tomato | 10 |
-
-*Gatekeeper uses a different CNN architecture (EfficientNet-B0)
-
-## API Examples
-
-### Python Example (Disease Detection)
-```python
-import requests
-import base64
-from PIL import Image
-
-# Load image
-img = Image.open('leaf.jpg')
-img_buffer = io.BytesIO()
-img.save(img_buffer, format='PNG')
-img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
-
-# Send request
-response = requests.post(
-    'http://localhost:5000/api/detect_disease',
-    json={
-        'crop': 'apple',
-        'image': img_base64
-    }
-)
-
-print(response.json())
-```
-
-### cURL Example
-```bash
-# Disease detection
-curl -X POST http://localhost:5000/api/detect_disease \
-  -H "Content-Type: application/json" \
-  -d '{"crop":"apple","image":"<base64_image>"}'
-
-# Health check
-curl http://localhost:5000/api/health
-```
-
-## Performance Metrics
-
-- **Disease Detection Response Time**: ~1-2 seconds per image
-- **Accuracy**: >85% on validation datasets
-- **Supported Image Formats**: PNG, JPG, JPEG, BMP
-- **Maximum Image Size**: No hard limit (will be resized to 224×224)
-
-## Troubleshooting
-
-### Flask development server warning
-```
-WARNING: This is a development server. Do not use it in a production deployment.
-```
-This is expected when running `python app.py` locally. It is not an application error. Stop the server with `Ctrl+C`.
-
-### Negative R-squared during LSTM training
-R-squared can be negative when a validation split has little target variation or when the model is still learning. The training script now uses a fixed random seed, reports baseline RMSE, and saves the checkpoint by lowest validation RMSE. Replace the synthetic CSV with real historical weather/yield observations for meaningful production accuracy.
-
-### "Model not found" Error
-```
-Solution: Verify CNN checkpoints exist in models/cnn_models/
-```
-
-### "Yield model not found" (503 Error)
-```
-Solution: Normal behavior - train the LSTM model using train_lstm.py
-```
-
-### NNPACK Warning
-```
-[W] Could not initialize NNPACK! Reason: Unsupported hardware.
-Solution: Harmless warning - system uses standard PyTorch operations
-```
-
-### CUDA/GPU Issues
-```
-Solution: Models automatically fall back to CPU if CUDA unavailable
-```
-
-## Project Statistics
-
-- **Total Crops**: 14
-- **Disease Classes**: 10-14 per crop
-- **Pre-trained Models**: 14 CNN checkpoints
-- **API Endpoints**: 3
-- **Frontend Pages**: 1 interactive dashboard
-
-## Future Enhancements
-
-- [ ] Real-time IoT sensor integration
-- [ ] Historical prediction tracking
-- [ ] Multi-image averaging for robust predictions
-- [ ] Mobile app (iOS/Android)
-- [ ] Model versioning and A/B testing
-- [ ] Automated model retraining pipeline
-- [ ] Admin dashboard for model management
-- [ ] Export predictions to CSV/PDF
-
-## Dependencies
-
-- **Deep Learning**: PyTorch, TensorFlow/Keras, timm
-- **Data Processing**: NumPy, Pandas, Pillow, scikit-learn
-- **Web Framework**: Flask
-- **Utilities**: Python 3.8+
-
-See `requirements.txt` for exact versions.
-
-## License
-
-Agricultural AI Research Project - Tribhuvan University, Institute of Engineering
-
-## Support & Documentation
-
-- **SRS Document**: See attached Software Requirements Specification
-- **Team**: Multi-Crop Team (ENCT 352)
-- **Submitted to**: Asst. Prof. Binay Lal Shrestha
-
-## Status
-
-✅ **Disease Detection**: Fully Operational
-⏳ **Yield Prediction**: Ready for Training
-✅ **Web Interface**: Fully Operational
-✅ **API**: Fully Operational
+All non-GET requests require a valid CSRF token (see Security below).
 
 ---
 
-**Last Updated**: August 21, 2026
-**Status**: Production Ready (Disease Detection), Beta (Yield Prediction)
+## Model Details
+
+**Gatekeeper CNN** — EfficientNet-B0 (via `timm`), 14-class species classification, 256-dim
+feature output, non-strict checkpoint loading to tolerate classifier-head differences.
+
+**CropCNN** — 3-layer conv net (3→16→32→64 channels) with max pooling, 224×224 input,
+256-dim feature output, 10-class disease head, used for 13 of the 14 crops.
+
+**SpatialPaddyLSTM** — 2-layer LSTM, hidden size 128, input size 33 per timestep (weather +
+location + crop one-hot + plant-health signals), 12-step sequence, outputs a normalized yield.
+
+**BuddyFusionNet** — small MLP (12 → 32 → 16 → 1) that fuses the LSTM yield estimate with
+plant-health signals into the final prediction.
+
+**YieldLSTM** (`models/lstm_model.py`, `train_lstm.py`) — a simpler, earlier weather-only LSTM
+kept for reference/training experimentation; the live app path uses `SpatialPaddyLSTM` +
+`BuddyFusionNet` instead (see `utils/yield_pipeline.py`).
+
+---
+
+## Training
+
+```bash
+# Regenerate the synthetic weather/yield dataset
+python generate_synthetic_yield_data.py
+
+# Train the buddy fusion network (requires spatial_paddy_lstm_final.pth to already exist)
+python train_buddy.py
+
+# (Legacy) train the plain weather-only LSTM
+python train_lstm.py
+```
+
+**The bundled dataset is synthetic.** Replace `data/yield_data.csv` with real historical
+weather/yield observations before treating any accuracy numbers as production-grade. See
+`SECURITY_AUDIT.md` for the full list of things to validate before public deployment.
+
+---
+
+## Security
+
+See `SECURITY_AUDIT.md` for the full audit. In short:
+- CSRF tokens are enforced on all non-GET requests via `before_request`.
+- Passwords are hashed (Werkzeug); sessions are HttpOnly + SameSite=Lax.
+- Uploads are size-limited, filename-sanitized, and staged (not auto-activated).
+- Security headers (CSP, X-Frame-Options, nosniff, Referrer-Policy) are set on every response.
+- Set a real `SECRET_KEY` environment variable before any non-local deployment.
+
+---
+
+## Troubleshooting
+
+- **Flask dev-server warning** — expected locally; use a production WSGI server (e.g. gunicorn)
+  for real deployment.
+- **"Yield model not found" (503)** — the Spatial LSTM or Buddy checkpoint is missing; check
+  `models/spatial_paddy_lstm_final.pth` and `models/buddy_fusion.pth` exist.
+- **NNPACK warning** — harmless; PyTorch falls back to standard kernels on unsupported hardware.
+- **CUDA/GPU** — the app automatically falls back to CPU if CUDA isn't available.
+
+---
+
+## Known Limitations
+
+- Yield data is synthetic; real historical observations are needed for production accuracy.
+- Admin-uploaded datasets/models are staged for review but not schema/shape-validated before
+  activation.
+- Guest (unauthenticated) predictions are stored with a null user ID.
+- No automated CI yet.
+
+## Project Origin
+
+Course: Software Engineering (Practical) — ENCT 352
+University: Tribhuvan University, Institute of Engineering, Purwanchal Campus
+Submitted to: Asst. Prof. Binay Lal Shrestha

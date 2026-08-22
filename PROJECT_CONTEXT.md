@@ -1,3 +1,15 @@
+> **⚠️ Superseded.** This document is the original lab-derived build specification
+> (SRS/DFD/UML from Labs 1–3), kept for historical reference only. The system has since
+> evolved beyond it — most notably, disease detection is a two-stage Gatekeeper→Species-CNN
+> pipeline, and yield prediction now runs through a `SpatialPaddyLSTM` + `BuddyFusionNet`
+> fusion, not the single plain LSTM described below. **See `README.md` for the current,
+> accurate architecture and status.** Sections 12 and 13 below ("Task List" and "Known Gaps")
+> describe an earlier project state and are now resolved — auth, prediction history, and
+> role-based admin/analyst views are all implemented; see `IMPLEMENTATION_STATUS` history in
+> git for that resolution, and `README.md` for what exists today.
+
+---
+
 # Project Context Document
 ## Smart Multi-Crop Disease Detection and Yield Prediction using CNN and LSTM Models
 
