@@ -12,6 +12,14 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 
 from config import AGRICULTURAL_LOCATIONS, CROP_NAMES, DEVICE, WEATHER_SEQUENCE_LENGTH
+from translations import (
+    DEFAULT_LANG,
+    SUPPORTED_LANGUAGES,
+    LANGUAGE_LABELS,
+    crop_label,
+    js_strings_for,
+    translate,
+)
 from utils.database import (
     add_prediction,
     authenticate_user,
@@ -49,14 +57,6 @@ yield_pipeline = YieldPipeline()
 yield_model_ready = yield_pipeline.spatial_ready
 
 
-@app.context_processor
-def inject_globals():
-    return {
-        "csrf_token": generate_csrf_token(),
-        "user": current_user(),
-    }
-
-
 @app.before_request
 def enforce_csrf():
     if request.endpoint in {"static"}:
@@ -82,6 +82,35 @@ def add_security_headers(response):
 def current_user():
     user_id = session.get("user_id")
     return find_user(user_id) if user_id else None
+
+
+def current_lang():
+    return session.get("lang", DEFAULT_LANG)
+
+
+@app.context_processor
+def inject_globals():
+    lang = current_lang()
+    return {
+        "csrf_token": generate_csrf_token(),
+        "user": current_user(),
+        "lang": lang,
+        "supported_languages": SUPPORTED_LANGUAGES,
+        "language_labels": LANGUAGE_LABELS,
+        "t": lambda key, **kwargs: translate(lang, key, **kwargs),
+        "crop_label": lambda crop: crop_label(crop, lang),
+        "js_i18n": js_strings_for(lang),
+    }
+
+
+@app.route("/set-language/<lang_code>")
+def set_language(lang_code):
+    if lang_code in SUPPORTED_LANGUAGES:
+        session["lang"] = lang_code
+    next_url = request.referrer
+    if not next_url or not next_url.startswith(request.host_url):
+        next_url = url_for("index")
+    return redirect(next_url)
 
 
 def role_required(*roles):
@@ -164,7 +193,25 @@ def logout():
 def history():
     user = current_user()
     records = list_predictions(None if user["role"] in ("analyst", "admin") else user["id"])
-    return render_template("history.html", records=records)
+
+    yield_trend = [
+        {"date": r["created_at"], "yield": r["yield_prediction"]}
+        for r in records
+        if r["prediction_type"] == "yield" and r["yield_prediction"] is not None
+    ][::-1]  # oldest first, left-to-right
+
+    disease_counts = {}
+    for r in records:
+        if r["prediction_type"] == "disease":
+            crop = r["crop"] or "unknown"
+            disease_counts[crop] = disease_counts.get(crop, 0) + 1
+
+    return render_template(
+        "history.html",
+        records=records,
+        yield_trend=yield_trend,
+        disease_counts=disease_counts,
+    )
 
 
 @app.route("/admin")
@@ -364,7 +411,8 @@ def detect_disease():
             return jsonify({"error": "Image payload is invalid or too large."}), 400
 
         image = decode_image(image_data)
-        result = feature_extractor.detect_disease(crop_name, image)
+        lang = data.get("lang") if data.get("lang") in SUPPORTED_LANGUAGES else current_lang()
+        result = feature_extractor.detect_disease(crop_name, image, lang=lang)
         if "error" in result:
             return jsonify(result), 400
 

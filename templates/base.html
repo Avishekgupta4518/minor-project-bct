@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,25 +15,35 @@
                 <span class="brand-mark">FC</span>
                 <span>
                     <strong>Field Companion</strong>
-                    <small>Plant health + harvest forecast</small>
+                    <small>{{ t('brand_tagline') }}</small>
                 </span>
             </a>
-            <button class="nav-toggle" type="button" id="nav-toggle" aria-label="Open menu">Menu</button>
+            <button class="nav-toggle" type="button" id="nav-toggle" aria-label="Open menu">{{ t('menu_button') }}</button>
             <div class="navbar-menu" id="navbar-menu">
-                <a href="{{ url_for('index') }}">Dashboard</a>
-                {% if user %}<a href="{{ url_for('history') }}">History</a>{% endif %}
-                {% if user and user['role'] in ('analyst', 'admin') %}<a href="{{ url_for('analyst_dashboard') }}">Analyst</a>{% endif %}
+                <a href="{{ url_for('index') }}">{{ t('nav_dashboard') }}</a>
+                {% if user %}<a href="{{ url_for('history') }}">{{ t('nav_history') }}</a>{% endif %}
+                {% if user and user['role'] in ('analyst', 'admin') %}<a href="{{ url_for('analyst_dashboard') }}">{{ t('nav_analyst') }}</a>{% endif %}
                 {% if user and user['role'] == 'admin' %}
-                    <a href="{{ url_for('admin_dashboard') }}">Admin</a>
-                    <a href="{{ url_for('manage_dataset') }}">Dataset</a>
-                    <a href="{{ url_for('manage_models') }}">Models</a>
+                    <a href="{{ url_for('admin_dashboard') }}">{{ t('nav_admin') }}</a>
+                    <a href="{{ url_for('manage_dataset') }}">{{ t('nav_dataset') }}</a>
+                    <a href="{{ url_for('manage_models') }}">{{ t('nav_models') }}</a>
                 {% endif %}
                 {% if user %}
-                    <a href="{{ url_for('logout') }}">Sign out</a>
+                    <a href="{{ url_for('logout') }}">{{ t('nav_sign_out') }}</a>
                     <span class="user-chip">{{ user['name'] }} · {{ user['role'] }}</span>
                 {% else %}
-                    <a href="{{ url_for('login') }}">Sign in</a>
+                    <a href="{{ url_for('login') }}">{{ t('nav_sign_in') }}</a>
                 {% endif %}
+                <span class="lang-switch">
+                    {% for code in supported_languages %}
+                        {% if code == lang %}
+                            <strong>{{ language_labels[code] }}</strong>
+                        {% else %}
+                            <a href="{{ url_for('set_language', lang_code=code) }}">{{ language_labels[code] }}</a>
+                        {% endif %}
+                        {% if not loop.last %} · {% endif %}
+                    {% endfor %}
+                </span>
                 <span class="status-indicator" id="health-status" title="API status">●</span>
             </div>
         </div>
@@ -44,9 +54,13 @@
     </main>
 
     <footer>
-        <p>Field Companion keeps leaf diagnosis and weather yield in one place. Forecasts support decisions; they are not a guaranteed harvest.</p>
+        <p>{{ t('footer_note') }}</p>
     </footer>
 
+    <script>
+        window.APP_LANG = {{ lang | tojson }};
+        window.APP_I18N = {{ js_i18n | tojson }};
+    </script>
     <script src="{{ url_for('static', filename='js/app.js', v='20260821-buddy-v1') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>

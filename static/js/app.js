@@ -1,3 +1,13 @@
+const I18N = window.APP_I18N || {};
+const APP_LANG = window.APP_LANG || 'en';
+const t = (key, vars = {}) => {
+    let str = I18N[key] || key;
+    Object.entries(vars).forEach(([k, v]) => {
+        str = str.replace(`{${k}}`, v);
+    });
+    return str;
+};
+
 const showElement = (id) => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('hidden');
@@ -33,6 +43,7 @@ const apiFetch = (url, options = {}) => {
 };
 
 let lastDiseaseResult = null;
+let lastYieldResult = null;
 
 const setupNavigation = () => {
     const toggle = document.getElementById('nav-toggle');
@@ -61,10 +72,28 @@ const setupFilePreview = () => {
 };
 
 const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const MAX_DIMENSION = 1024;
     const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result.split(',')[1]);
     reader.onerror = reject;
+    reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+            let { width, height } = img;
+            if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                const scale = MAX_DIMENSION / Math.max(width, height);
+                width = Math.round(width * scale);
+                height = Math.round(height * scale);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+        };
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
 });
 
 const setupDiseaseDetection = () => {
@@ -80,17 +109,17 @@ const setupDiseaseDetection = () => {
         try {
             const crop = document.getElementById('crop-select').value;
             const file = document.getElementById('disease-image').files[0];
-            if (!crop || !file) throw new Error('Choose a crop and upload a leaf image.');
+            if (!crop || !file) throw new Error(t('choose_crop_and_image'));
 
             const imageBase64 = await fileToBase64(file);
             const response = await apiFetch('/api/detect_disease', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ crop, image: imageBase64 }),
+                body: JSON.stringify({ crop, image: imageBase64, lang: APP_LANG }),
             });
             const result = await response.json();
             hideElement('disease-loading');
-            if (!response.ok) throw new Error(result.error || 'Disease detection failed');
+            if (!response.ok) throw new Error(result.error || t('disease_detection_failed'));
             lastDiseaseResult = result;
             const yieldCrop = document.getElementById('yield-crop');
             if (yieldCrop && !yieldCrop.value) yieldCrop.value = crop;
@@ -104,13 +133,12 @@ const setupDiseaseDetection = () => {
 
 const displayDiseaseResult = (result) => {
     document.getElementById('result-crop').textContent = result.crop;
-    document.getElementById('result-class').textContent = result.predicted_label || `Class ${result.predicted_class}`;
+    document.getElementById('result-class').textContent = result.predicted_label_display || result.predicted_label || `Class ${result.predicted_class}`;
     document.getElementById('result-confidence').textContent = `${(result.confidence * 100).toFixed(2)}%`;
+    document.getElementById('result-recommendation').textContent = result.recommendation || '';
     const note = document.getElementById('buddy-note');
     const healthy = String(result.predicted_label || '').toLowerCase().includes('healthy');
-    note.textContent = healthy
-        ? 'This scan looks healthy. The yield buddy will support the weather forecast.'
-        : 'This scan found a problem. The yield buddy will lower the weather-only harvest number.';
+    note.textContent = healthy ? t('buddy_note_healthy') : t('buddy_note_sick');
 
     const probDiv = document.getElementById('result-probabilities');
     probDiv.replaceChildren();
@@ -148,27 +176,27 @@ const setupYieldPrediction = () => {
 
     weatherInputs.forEach((input) => input.addEventListener('input', () => {
         weatherSequence = null;
-        weatherSource.textContent = 'Using the values you typed. Load a region forecast for a true future sequence.';
+        weatherSource.textContent = t('weather_manual');
     }));
 
     document.getElementById('fetch-weather').addEventListener('click', async () => {
         const place = document.getElementById('weather-location').value;
         if (!place) {
-            showError('yield-error', 'Choose a field region before loading weather.');
+            showError('yield-error', t('choose_region_first'));
             return;
         }
         try {
             hideError('yield-error');
             const response = await apiFetch(`/api/weather?place=${encodeURIComponent(place)}`);
             const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Live weather lookup failed');
+            if (!response.ok) throw new Error(result.error || t('weather_lookup_failed'));
             weatherSequence = result.sequence;
             const current = weatherSequence[0];
             document.getElementById('weather-temperature').value = toFourDecimals(current.temperature).toFixed(4);
             document.getElementById('weather-rainfall').value = toFourDecimals(current.rainfall).toFixed(4);
             document.getElementById('weather-humidity').value = toFourDecimals(current.humidity).toFixed(4);
             document.getElementById('weather-soil-moisture').value = toFourDecimals(current.soil_moisture).toFixed(4);
-            weatherSource.textContent = `Loaded a 12-step future forecast for ${result.location}.`;
+            weatherSource.textContent = t('weather_loaded', { location: result.location });
         } catch (error) {
             showError('yield-error', error.message);
         }
@@ -188,7 +216,7 @@ const setupYieldPrediction = () => {
                 soil_moisture: document.getElementById('weather-soil-moisture').value,
             };
             if (Object.values(rawWeather).some((value) => value === '')) {
-                throw new Error('Enter all weather values or load a region forecast.');
+                throw new Error(t('enter_all_weather'));
             }
             const weather = {
                 temperature: Number(rawWeather.temperature),
@@ -202,6 +230,7 @@ const setupYieldPrediction = () => {
                 : { weather };
             payload.crop = crop;
             payload.place = document.getElementById('weather-location').value || null;
+            payload.lang = APP_LANG;
             if (lastDiseaseResult) {
                 payload.disease = {
                     crop: lastDiseaseResult.crop,
@@ -219,7 +248,7 @@ const setupYieldPrediction = () => {
             });
             const result = await response.json();
             hideElement('yield-loading');
-            if (!response.ok) throw new Error(result.error || 'Yield prediction failed');
+            if (!response.ok) throw new Error(result.error || t('yield_prediction_failed'));
             displayYieldResult(result);
         } catch (error) {
             hideElement('yield-loading');
@@ -229,15 +258,16 @@ const setupYieldPrediction = () => {
 };
 
 const relationshipLabel = (code) => ({
-    aligned: 'Aligned',
-    weather_only: 'Weather only',
-    plant_supports_weather: 'Plant supports weather',
-    disease_reduces_yield: 'Disease reduces yield',
-    weak_shift: 'Small shift',
-    mixed_signals: 'Mixed signals',
+    aligned: t('relationship_aligned'),
+    weather_only: t('relationship_weather_only'),
+    plant_supports_weather: t('relationship_plant_supports_weather'),
+    disease_reduces_yield: t('relationship_disease_reduces_yield'),
+    weak_shift: t('relationship_weak_shift'),
+    mixed_signals: t('relationship_mixed_signals'),
 }[code] || code);
 
 const displayYieldResult = (result) => {
+    lastYieldResult = result;
     const fused = result.fused_yield ?? result.yield_prediction;
     const lstm = result.lstm_yield ?? fused;
     const adjustment = result.adjustment ?? 0;
@@ -245,24 +275,56 @@ const displayYieldResult = (result) => {
     document.getElementById('lstm-yield').textContent = `${Number(lstm).toFixed(2)} t/ha`;
     document.getElementById('yield-adjustment').textContent = `${adjustment > 0 ? '+' : ''}${Number(adjustment).toFixed(2)}`;
     document.getElementById('yield-trend').textContent = relationshipLabel(result.relationship);
-    document.getElementById('yield-coverage').textContent = result.sequence_length === 12 ? '12 future steps' : 'Manual input';
+    document.getElementById('yield-coverage').textContent = result.sequence_length === 12 ? t('coverage_12steps') : t('coverage_manual');
 
     const plantUsed = result.plant && result.plant.available;
-    let qualityText = plantUsed
-        ? 'The buddy used both the leaf scan and the weather LSTM.'
-        : 'No leaf scan was attached, so this is mostly a weather forecast.';
-    if (fused >= 6.0) qualityText = `Strong outlook. ${qualityText}`;
-    else if (fused >= 5.0) qualityText = `Usable outlook. ${qualityText}`;
-    else if (fused >= 4.0) qualityText = `Moderate outlook. ${qualityText}`;
-    else qualityText = `Low outlook. ${qualityText}`;
+    let qualityText = plantUsed ? t('buddy_used_both') : t('buddy_weather_only');
+    if (fused >= 6.0) qualityText = `${t('quality_strong')} ${qualityText}`;
+    else if (fused >= 5.0) qualityText = `${t('quality_usable')} ${qualityText}`;
+    else if (fused >= 4.0) qualityText = `${t('quality_moderate')} ${qualityText}`;
+    else qualityText = `${t('quality_low')} ${qualityText}`;
     document.getElementById('yield-quality').textContent = qualityText;
 
     const explanation = plantUsed
-        ? `Weather LSTM estimated ${Number(lstm).toFixed(2)} t/ha. After plant health was included, the joined forecast is ${Number(fused).toFixed(2)} t/ha (${adjustment > 0 ? 'up' : 'down'} ${Math.abs(adjustment).toFixed(2)}). Compare this with your field notes before acting.`
-        : `Scan a leaf first so the buddy can move this ${Number(fused).toFixed(2)} t/ha weather forecast with actual plant health.`;
+        ? t('explanation_full', {
+            lstm: Number(lstm).toFixed(2),
+            fused: Number(fused).toFixed(2),
+            direction: adjustment > 0 ? t('direction_up') : t('direction_down'),
+            delta: Math.abs(adjustment).toFixed(2),
+        })
+        : t('explanation_weather_only', { fused: Number(fused).toFixed(2) });
     document.getElementById('yield-explanation').textContent = explanation;
     document.getElementById('yield-bar-fill').style.width = `${Math.min((fused / 7.0) * 100, 100)}%`;
     showElement('yield-result');
+};
+
+const downloadReport = () => {
+    if (!lastDiseaseResult && !lastYieldResult) return;
+    const rows = [['Field', 'Value']];
+    if (lastDiseaseResult) {
+        rows.push(['Crop', lastDiseaseResult.crop]);
+        rows.push(['Disease finding', lastDiseaseResult.predicted_label]);
+        rows.push(['Confidence', `${(lastDiseaseResult.confidence * 100).toFixed(2)}%`]);
+        rows.push(['Recommendation', lastDiseaseResult.recommendation || '']);
+    }
+    if (lastYieldResult) {
+        rows.push(['Predicted yield (t/ha)', lastYieldResult.fused_yield]);
+        rows.push(['Weather-only yield (t/ha)', lastYieldResult.lstm_yield]);
+        rows.push(['Relationship', lastYieldResult.relationship]);
+    }
+    rows.push(['Generated', new Date().toISOString()]);
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `field-companion-report-${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+};
+
+const setupReportDownload = () => {
+    document.getElementById('download-report')?.addEventListener('click', downloadReport);
 };
 
 const checkHealth = async () => {
@@ -282,6 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFilePreview();
     setupDiseaseDetection();
     setupYieldPrediction();
+    setupReportDownload();
     checkHealth();
     setInterval(checkHealth, 30000);
 });

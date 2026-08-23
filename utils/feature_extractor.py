@@ -3,7 +3,15 @@ import torch
 from torchvision import transforms
 from PIL import Image
 
-from config import CROP_NAMES, DISEASE_CLASS_NAMES, NUM_DISEASE_CLASSES, CNN_MODEL_PATHS, DEVICE
+from config import (
+    CROP_NAMES,
+    DISEASE_CLASS_NAMES,
+    NUM_DISEASE_CLASSES,
+    CNN_MODEL_PATHS,
+    DEVICE,
+    get_disease_recommendation,
+    get_disease_label_display,
+)
 from models.cnn_arch import CropCNN, GatekeeperCNN
 
 if hasattr(torch.backends, "nnpack"):
@@ -58,13 +66,15 @@ class FeatureExtractor:
         features = torch.stack(feature_list).unsqueeze(0)  # (1, 12, 256)
         return features
 
-    def detect_disease(self, crop_name, image):
+    def detect_disease(self, crop_name, image, lang="en"):
         """
         Detect disease for a specific crop from an image.
         
         Args:
             crop_name: Name of the crop (str)
             image: PIL Image object or path to image
+            lang: 'en' or 'ne' — only affects recommendation/display text,
+                  never the canonical predicted_label used for storage/logic.
             
         Returns:
             dict with disease class, confidence score, and class probabilities
@@ -89,12 +99,15 @@ class FeatureExtractor:
         probabilities = probabilities.cpu().numpy().tolist()
         class_names = DISEASE_CLASS_NAMES[crop_name]
         
+        predicted_label = class_names[predicted_class]
         return {
             'crop': crop_name,
             'predicted_class': predicted_class,
-            'predicted_label': class_names[predicted_class],
+            'predicted_label': predicted_label,
+            'predicted_label_display': get_disease_label_display(predicted_label, lang=lang),
             'confidence': round(confidence, 4),
             'all_probabilities': probabilities,
             'class_labels': class_names,
-            'num_classes': len(probabilities)
+            'num_classes': len(probabilities),
+            'recommendation': get_disease_recommendation(predicted_label, lang=lang),
         }

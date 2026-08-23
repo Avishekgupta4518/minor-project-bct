@@ -1,12 +1,64 @@
 {% extends "base.html" %}
 {% block title %}Prediction History - Smart Multi-Crop{% endblock %}
 {% block content %}
-<div class="page-heading"><div><h2>Prediction History</h2><p>Review saved disease and yield results.</p></div></div>
+<div class="page-heading"><div><h2>{{ t('history_title') }}</h2><p>{{ t('history_desc') }}</p></div></div>
+
+{% if yield_trend %}
+<div class="panel" style="margin-bottom:1.25rem;">
+    <h3>{{ t('yield_trend_title') }}</h3>
+    <canvas id="yield-trend-chart" height="90"></canvas>
+</div>
+{% endif %}
+
+{% if disease_counts %}
+<div class="panel" style="margin-bottom:1.25rem;">
+    <h3>{{ t('disease_scans_title') }}</h3>
+    <canvas id="disease-count-chart" height="90"></canvas>
+</div>
+{% endif %}
+
 <div class="table-panel panel">
     {% if records %}
-    <div class="table-scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Crop</th><th>Result</th><th>Confidence</th><th>User</th></tr></thead><tbody>
-    {% for record in records %}<tr><td>{{ record['created_at'] }}</td><td>{{ record['prediction_type']|capitalize }}</td><td>{{ record['crop'] or '-' }}</td><td>{% if record['prediction_type'] == 'yield' %}{{ record['yield_prediction'] }} tons/hectare{% else %}{{ record['disease_label'] or ('Class ' ~ record['disease_class']) }}{% endif %}</td><td>{% if record['confidence'] is not none %}{{ (record['confidence'] * 100)|round(1) }}%{% else %}-{% endif %}</td><td>{{ record['name'] or 'Guest' }}</td></tr>{% endfor %}
+    <div class="table-scroll"><table><thead><tr><th>{{ t('th_date') }}</th><th>{{ t('th_type') }}</th><th>{{ t('th_crop') }}</th><th>{{ t('th_result') }}</th><th>{{ t('th_confidence') }}</th><th>{{ t('th_user') }}</th></tr></thead><tbody>
+    {% for record in records %}<tr><td>{{ record['created_at'] }}</td><td>{{ record['prediction_type']|capitalize }}</td><td>{{ crop_label(record['crop']) if record['crop'] else '-' }}</td><td>{% if record['prediction_type'] == 'yield' %}{{ record['yield_prediction'] }} {{ t('unit_tons_hectare_short') }}{% else %}{{ record['disease_label'] or ('Class ' ~ record['disease_class']) }}{% endif %}</td><td>{% if record['confidence'] is not none %}{{ (record['confidence'] * 100)|round(1) }}%{% else %}-{% endif %}</td><td>{{ record['name'] or t('guest') }}</td></tr>{% endfor %}
     </tbody></table></div>
-    {% else %}<p class="empty-state">No prediction history yet.</p>{% endif %}
+    {% else %}<p class="empty-state">{{ t('no_history') }}</p>{% endif %}
 </div>
+
+{% if yield_trend or disease_counts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+{% if yield_trend %}
+new Chart(document.getElementById('yield-trend-chart'), {
+    type: 'line',
+    data: {
+        labels: {{ yield_trend | map(attribute='date') | list | tojson }},
+        datasets: [{
+            label: 'Predicted yield (t/ha)',
+            data: {{ yield_trend | map(attribute='yield') | list | tojson }},
+            borderColor: '#2f6b45',
+            backgroundColor: 'rgba(47,107,69,0.12)',
+            tension: 0.25,
+            fill: true,
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+{% endif %}
+{% if disease_counts %}
+new Chart(document.getElementById('disease-count-chart'), {
+    type: 'bar',
+    data: {
+        labels: {{ disease_counts.keys() | list | tojson }},
+        datasets: [{
+            label: 'Scans',
+            data: {{ disease_counts.values() | list | tojson }},
+            backgroundColor: '#c47b2b',
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+{% endif %}
+</script>
+{% endif %}
 {% endblock %}

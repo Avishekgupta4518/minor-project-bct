@@ -5,160 +5,165 @@
 {% block content %}
 <section class="hero">
     <div>
-        <p class="eyebrow">Two models, one field decision</p>
-        <h1>See plant health and future yield together</h1>
-        <p>The CNN reads the leaf. The spatial LSTM reads the weather. A small buddy model then joins those two signals so the harvest number moves with the plant, not only with the sky.</p>
+        <p class="eyebrow">{{ t('home_eyebrow') }}</p>
+        <h1>{{ t('home_title') }}</h1>
+        <p>{{ t('home_intro') }}</p>
     </div>
     <div class="hero-status">
         <div class="status-card">
-            <span class="badge success">CNN ready</span>
-            <h3>Leaf diagnosis</h3>
-            <p>{{ crops|length }} trained crops</p>
+            <span class="badge success">{{ t('status_cnn_ready') }}</span>
+            <h3>{{ t('status_leaf_diagnosis') }}</h3>
+            <p>{{ t('status_trained_crops', count=crops|length) }}</p>
         </div>
         <div class="status-card">
             {% if yield_model_ready %}
-                <span class="badge success">LSTM ready</span>
+                <span class="badge success">{{ t('status_lstm_ready') }}</span>
             {% else %}
-                <span class="badge warning">LSTM missing</span>
+                <span class="badge warning">{{ t('status_lstm_missing') }}</span>
             {% endif %}
-            <h3>Spatial paddy forecast</h3>
-            <p>12-step future weather</p>
+            <h3>{{ t('status_spatial_forecast') }}</h3>
+            <p>{{ t('status_12step') }}</p>
         </div>
         <div class="status-card">
             {% if buddy_ready %}
-                <span class="badge success">Buddy ready</span>
+                <span class="badge success">{{ t('status_buddy_ready') }}</span>
             {% else %}
-                <span class="badge warning">Train buddy</span>
+                <span class="badge warning">{{ t('status_buddy_train') }}</span>
             {% endif %}
-            <h3>Plant–weather link</h3>
-            <p>CNN + LSTM fusion</p>
+            <h3>{{ t('status_plant_weather_link') }}</h3>
+            <p>{{ t('status_cnn_lstm_fusion') }}</p>
         </div>
     </div>
 </section>
 
 <div class="workflow">
-    <article>1. Scan a leaf</article>
-    <article>2. Load field weather</article>
-    <article>3. Read the joined forecast</article>
+    <article>{{ t('workflow_1') }}</article>
+    <article>{{ t('workflow_2') }}</article>
+    <article>{{ t('workflow_3') }}</article>
 </div>
 
 <div class="panels-grid">
     <div class="panel disease-panel">
-        <h2>Leaf health</h2>
-        <p class="panel-description">Upload a clear leaf photo. This CNN result is saved and later used by the yield buddy.</p>
+        <h2>{{ t('leaf_health_title') }}</h2>
+        <p class="panel-description">{{ t('leaf_health_desc') }}</p>
 
         <form id="disease-form" class="form-group">
             <div class="form-control">
-                <label for="crop-select">Crop</label>
-                <select id="crop-select" name="crop" required>
-                    <option value="">Choose a crop</option>
+                <label for="crop-select">{{ t('label_crop') }}</label>
+                <select id="crop-select" name="crop" required title="{{ t('crop_select_title') }}">
+                    <option value="">{{ t('choose_crop') }}</option>
                     {% for crop in crops %}
-                        <option value="{{ crop }}">{{ crop|capitalize }}</option>
+                        <option value="{{ crop }}">{{ crop_label(crop) }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <div class="form-control">
-                <label for="disease-image">Leaf image</label>
+                <label for="disease-image">{{ t('label_leaf_image') }}</label>
                 <div class="file-input-wrapper">
                     <input type="file" id="disease-image" name="image" accept="image/jpeg,image/png,image/webp" required>
-                    <label for="disease-image" class="file-label">Choose JPEG, PNG, or WEBP</label>
+                    <label for="disease-image" class="file-label">{{ t('choose_image') }}</label>
                 </div>
                 <div id="image-preview" class="image-preview"></div>
             </div>
 
-            <button type="submit" class="btn btn-primary">Scan leaf</button>
+            <button type="submit" class="btn btn-primary">{{ t('btn_scan_leaf') }}</button>
         </form>
 
         <div id="disease-result" class="result-container hidden">
-            <h3>Plant scan</h3>
+            <h3>{{ t('plant_scan_title') }}</h3>
             <div class="result-content">
-                <p><strong>Crop:</strong> <span id="result-crop"></span></p>
-                <p><strong>Finding:</strong> <span id="result-class"></span></p>
-                <p><strong>Confidence:</strong> <span id="result-confidence"></span></p>
+                <p><strong>{{ t('label_crop_result') }}</strong> <span id="result-crop"></span></p>
+                <p><strong>{{ t('label_finding') }}</strong> <span id="result-class"></span></p>
+                <p><strong>{{ t('label_confidence') }}</strong> <span id="result-confidence"></span></p>
+                <p><strong>{{ t('label_recommendation') }}</strong> <span id="result-recommendation"></span></p>
                 <p id="buddy-note" class="hint"></p>
                 <div id="result-probabilities" class="probabilities-chart"></div>
             </div>
         </div>
 
         <div id="disease-error" class="error-message hidden"></div>
-        <div id="disease-loading" class="loading hidden">Reading the leaf</div>
+        <div id="disease-loading" class="loading hidden">{{ t('loading_leaf') }}</div>
     </div>
 
     <div class="panel yield-panel">
-        <h2>Future harvest</h2>
-        <p class="panel-description">Use a Nepal agricultural region forecast or your own measurements. The spatial LSTM predicts weather yield; the buddy then adjusts it with plant health.</p>
+        <h2>{{ t('future_harvest_title') }}</h2>
+        <p class="panel-description">{{ t('future_harvest_desc') }}</p>
 
         {% if yield_model_ready %}
         <form id="yield-form" class="form-group">
             <div class="form-control">
-                <label for="yield-crop">Crop for this forecast</label>
+                <label for="yield-crop">{{ t('label_yield_crop') }}</label>
                 <select id="yield-crop">
-                    <option value="">Same as leaf scan, or choose</option>
+                    <option value="">{{ t('same_as_scan') }}</option>
                     {% for crop in crops %}
-                        <option value="{{ crop }}">{{ crop|capitalize }}</option>
+                        <option value="{{ crop }}">{{ crop_label(crop) }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="location-controls">
                 <div class="form-control">
-                    <label for="weather-location">Field region</label>
+                    <label for="weather-location">{{ t('label_field_region') }}</label>
                     <select id="weather-location" required>
-                        <option value="">Choose a region</option>
+                        <option value="">{{ t('choose_region') }}</option>
                         {% for key, location in agricultural_locations.items() %}
                             <option value="{{ key }}">{{ location.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <button type="button" id="fetch-weather" class="btn btn-secondary">Load 12-step forecast</button>
+                <button type="button" id="fetch-weather" class="btn btn-secondary">{{ t('btn_load_forecast') }}</button>
             </div>
-            <p id="weather-source" class="weather-source">Load live weather for the coming hours, then predict the future harvest.</p>
+            <p id="weather-source" class="weather-source">{{ t('js_weather_source_default') }}</p>
             <div class="weather-grid">
                 <div class="form-control">
-                    <label for="weather-temperature">Temperature (°C)</label>
-                    <input id="weather-temperature" type="number" min="0" max="45" step="0.0001" required>
+                    <label for="weather-temperature">{{ t('label_temperature') }}</label>
+                    <input id="weather-temperature" type="number" min="0" max="45" step="0.0001" required
+                           title="{{ t('tip_temperature') }}" placeholder="e.g. 27">
                 </div>
                 <div class="form-control">
-                    <label for="weather-rainfall">Rainfall (mm)</label>
-                    <input id="weather-rainfall" type="number" min="0" max="300" step="0.0001" required>
+                    <label for="weather-rainfall">{{ t('label_rainfall') }}</label>
+                    <input id="weather-rainfall" type="number" min="0" max="300" step="0.0001" required
+                           title="{{ t('tip_rainfall') }}" placeholder="e.g. 185">
                 </div>
                 <div class="form-control">
-                    <label for="weather-humidity">Humidity (%)</label>
-                    <input id="weather-humidity" type="number" min="0" max="100" step="0.0001" required>
+                    <label for="weather-humidity">{{ t('label_humidity') }}</label>
+                    <input id="weather-humidity" type="number" min="0" max="100" step="0.0001" required
+                           title="{{ t('tip_humidity') }}" placeholder="e.g. 72">
                 </div>
                 <div class="form-control">
-                    <label for="weather-soil-moisture">Soil moisture (%)</label>
-                    <input id="weather-soil-moisture" type="number" min="0" max="100" step="0.0001" required>
+                    <label for="weather-soil-moisture">{{ t('label_soil_moisture') }}</label>
+                    <input id="weather-soil-moisture" type="number" min="0" max="100" step="0.0001" required
+                           title="{{ t('tip_soil_moisture') }}" placeholder="e.g. 65">
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">Predict future yield</button>
+            <button type="submit" class="btn btn-primary">{{ t('btn_predict_yield') }}</button>
         </form>
 
         <div id="yield-result" class="result-container hidden">
-            <h3>Joined forecast</h3>
+            <h3>{{ t('joined_forecast_title') }}</h3>
             <div class="result-content">
                 <div class="yield-summary-grid">
                     <div class="yield-summary-stat">
-                        <span class="summary-label">Weather LSTM</span>
+                        <span class="summary-label">{{ t('label_weather_lstm') }}</span>
                         <strong id="lstm-yield">-</strong>
                     </div>
                     <div class="yield-summary-stat">
-                        <span class="summary-label">Buddy adjustment</span>
+                        <span class="summary-label">{{ t('label_buddy_adjustment') }}</span>
                         <strong id="yield-adjustment">-</strong>
                     </div>
                     <div class="yield-summary-stat">
-                        <span class="summary-label">Relationship</span>
+                        <span class="summary-label">{{ t('label_relationship') }}</span>
                         <strong id="yield-trend">-</strong>
                     </div>
                     <div class="yield-summary-stat">
-                        <span class="summary-label">Coverage</span>
+                        <span class="summary-label">{{ t('label_coverage') }}</span>
                         <strong id="yield-coverage">-</strong>
                     </div>
                 </div>
                 <div class="yield-prediction-box">
                     <div class="yield-value-display">
                         <span id="result-yield" class="yield-value">0.0</span>
-                        <span class="yield-unit">tons / hectare</span>
+                        <span class="yield-unit">{{ t('unit_tons_hectare') }}</span>
                     </div>
                     <div class="yield-insights">
                         <p id="yield-quality"></p>
@@ -172,30 +177,35 @@
         </div>
         {% else %}
         <div class="alert alert-warning">
-            <strong>Spatial LSTM is not available</strong>
-            <p>Place <code>spatial_paddy_lstm_final.pth</code> in the models folder and restart the app.</p>
+            <strong>{{ t('lstm_missing_title') }}</strong>
+            <p>{{ t('lstm_missing_body') }}</p>
         </div>
         {% endif %}
 
         <div id="yield-error" class="error-message hidden"></div>
-        <div id="yield-loading" class="loading hidden">Forecasting harvest</div>
+        <div id="yield-loading" class="loading hidden">{{ t('loading_harvest') }}</div>
     </div>
 </div>
 
+<div class="panel" style="margin-top:1.25rem;">
+    <button type="button" id="download-report" class="btn btn-secondary">{{ t('btn_download_report') }}</button>
+    <p class="hint">{{ t('download_report_hint') }}</p>
+</div>
+
 <div class="info-panel">
-    <h2>How the buddy works</h2>
+    <h2>{{ t('how_buddy_title') }}</h2>
     <div class="info-grid">
         <div class="info-card">
-            <h4>CNN</h4>
-            <p>Classifies disease from the leaf and produces a plant-health score.</p>
+            <h4>{{ t('how_cnn_title') }}</h4>
+            <p>{{ t('how_cnn_desc') }}</p>
         </div>
         <div class="info-card">
-            <h4>Spatial LSTM</h4>
-            <p>Reads 33 features per weather step, including location, crop, and plant signals, then forecasts yield.</p>
+            <h4>{{ t('how_lstm_title') }}</h4>
+            <p>{{ t('how_lstm_desc') }}</p>
         </div>
         <div class="info-card">
-            <h4>Buddy fusion</h4>
-            <p>A small network learns how plant stress should raise or lower the weather-only harvest number.</p>
+            <h4>{{ t('how_fusion_title') }}</h4>
+            <p>{{ t('how_fusion_desc') }}</p>
         </div>
     </div>
 </div>
