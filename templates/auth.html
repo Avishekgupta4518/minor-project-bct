@@ -1,20 +1,27 @@
 {% extends "base.html" %}
-{% block title %}{{ t('auth_sign_in') if mode == 'login' else t('auth_create_account') }} - Smart Multi-Crop{% endblock %}
+{% block title %}{{ t('auth_sign_in') if mode == 'login' else t('auth_create_account') }} - Smart Multi-Crop{% endblock
+%}
 {% block content %}
 <div class="auth-panel panel">
     <h2>{{ t('auth_sign_in') if mode == 'login' else t('auth_create_farmer_account') }}</h2>
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
+    {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
     {% endwith %}
     <form method="post" class="form-group">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% if mode == 'register' %}
-        <div class="form-control"><label for="name">{{ t('label_name') }}</label><input id="name" name="name" required></div>
+        <div class="form-control"><label for="name">{{ t('label_name') }}</label><input id="name" name="name" required>
+        </div>
         {% endif %}
-        <div class="form-control"><label for="email">{{ t('label_email') }}</label><input id="email" name="email" type="email" required></div>
-        <div class="form-control"><label for="password">{{ t('label_password') }}</label><input id="password" name="password" type="password" minlength="8" required></div>
-        <button class="btn btn-primary" type="submit">{{ t('auth_sign_in') if mode == 'login' else t('auth_create_account') }}</button>
+        <div class="form-control"><label for="email">{{ t('label_email') }}</label><input id="email" name="email"
+                type="email" required></div>
+        <div class="form-control"><label for="password">{{ t('label_password') }}</label><input id="password"
+                name="password" type="password" minlength="8" required></div>
+        <button class="btn btn-primary" type="submit">{{ t('auth_sign_in') if mode == 'login' else
+            t('auth_create_account') }}</button>
     </form>
-    {% if mode == 'login' %}<p class="auth-link">{{ t('auth_new_farmer') }} <a href="{{ url_for('register') }}">{{ t('auth_create_link') }}</a></p>{% else %}<p class="auth-link">{{ t('auth_already_registered') }} <a href="{{ url_for('login') }}">{{ t('auth_sign_in_link') }}</a></p>{% endif %}
+    {% if mode == 'login' %}<p class="auth-link">{{ t('auth_new_farmer') }} <a href="{{ url_for('register') }}">{{
+            t('auth_create_link') }}</a></p>{% else %}<p class="auth-link">{{ t('auth_already_registered') }} <a
+            href="{{ url_for('login') }}">{{ t('auth_sign_in_link') }}</a></p>{% endif %}
 </div>
 {% endblock %}

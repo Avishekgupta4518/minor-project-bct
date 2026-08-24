@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>{% block title %}Field Companion{% endblock %}</title>
+    <title>{% block title %}Leaf Scan{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -12,9 +12,9 @@
     <nav class="navbar">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <span class="brand-mark">FC</span>
+                <span class="brand-mark">LS</span>
                 <span>
-                    <strong>Field Companion</strong>
+                    <strong>Leaf Scan</strong>
                     <small>{{ t('brand_tagline') }}</small>
                 </span>
             </a>
