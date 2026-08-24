@@ -18,7 +18,7 @@
     </div>
     <div class="status-card">
         <h3>{{ t('admin_yield_model') }}</h3><strong>{{ t('admin_ready') if yield_model_ready else
-            t('admin_unavailable') }}{% if buddy_ready %} · {{ t('admin_buddy_on') }}{% endif %}</strong>
+            t('admin_unavailable') }}</strong>
     </div>
 </div>
 <div class="panel admin-actions"><a class="btn btn-secondary" href="{{ url_for('manage_dataset') }}">{{

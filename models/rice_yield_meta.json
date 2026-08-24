@@ -1,0 +1,29 @@
+{
+  "places": [
+    "Bara",
+    "Chitwan",
+    "Jhapa",
+    "Kapilbastu",
+    "Kaski",
+    "Morang",
+    "Rautahat",
+    "Saptari",
+    "Sarlahi",
+    "Siraha"
+  ],
+  "yield_min": 0.672,
+  "yield_max": 4.751,
+  "sequence_length": 10,
+  "last_years": {
+    "Bara": 202122,
+    "Chitwan": 202122,
+    "Jhapa": 202122,
+    "Kapilbastu": 202122,
+    "Kaski": 202122,
+    "Morang": 202122,
+    "Rautahat": 202122,
+    "Saptari": 202122,
+    "Sarlahi": 202122,
+    "Siraha": 202122
+  }
+}

@@ -28,8 +28,6 @@ const showError = (id, message) => {
 
 const hideError = (id) => hideElement(id);
 
-const toFourDecimals = (value) => Number(Number(value).toFixed(4));
-
 const csrfToken = () => {
     const meta = document.querySelector('meta[name="csrf-token"]');
     return meta ? meta.getAttribute('content') : '';
@@ -121,8 +119,6 @@ const setupDiseaseDetection = () => {
             hideElement('disease-loading');
             if (!response.ok) throw new Error(result.error || t('disease_detection_failed'));
             lastDiseaseResult = result;
-            const yieldCrop = document.getElementById('yield-crop');
-            if (yieldCrop && !yieldCrop.value) yieldCrop.value = crop;
             displayDiseaseResult(result);
         } catch (error) {
             hideElement('disease-loading');
@@ -133,12 +129,27 @@ const setupDiseaseDetection = () => {
 
 const displayDiseaseResult = (result) => {
     document.getElementById('result-crop').textContent = result.crop;
+    const routing = document.getElementById('result-gatekeeper');
+    if (routing) {
+        if (result.gatekeeper) {
+            const conf = `${(result.gatekeeper.confidence * 100).toFixed(2)}%`;
+            let text = t('gatekeeper_routed', { crop: result.crop, conf });
+            if (result.gatekeeper.fallback && result.gatekeeper.raw_top_crop) {
+                text += ' ' + t('gatekeeper_fallback', {
+                    crop: result.gatekeeper.raw_top_crop,
+                    alt: result.crop
+                });
+            }
+            routing.textContent = text;
+            routing.classList.remove('hidden');
+        } else {
+            routing.textContent = '';
+            routing.classList.add('hidden');
+        }
+    }
     document.getElementById('result-class').textContent = result.predicted_label_display || result.predicted_label || `Class ${result.predicted_class}`;
     document.getElementById('result-confidence').textContent = `${(result.confidence * 100).toFixed(2)}%`;
     document.getElementById('result-recommendation').textContent = result.recommendation || '';
-    const note = document.getElementById('buddy-note');
-    const healthy = String(result.predicted_label || '').toLowerCase().includes('healthy');
-    note.textContent = healthy ? t('buddy_note_healthy') : t('buddy_note_sick');
 
     const probDiv = document.getElementById('result-probabilities');
     probDiv.replaceChildren();
@@ -170,38 +181,6 @@ const setupYieldPrediction = () => {
     const form = document.getElementById('yield-form');
     if (!form) return;
 
-    let weatherSequence = null;
-    const weatherInputs = form.querySelectorAll('.weather-grid input');
-    const weatherSource = document.getElementById('weather-source');
-
-    weatherInputs.forEach((input) => input.addEventListener('input', () => {
-        weatherSequence = null;
-        weatherSource.textContent = t('weather_manual');
-    }));
-
-    document.getElementById('fetch-weather').addEventListener('click', async () => {
-        const place = document.getElementById('weather-location').value;
-        if (!place) {
-            showError('yield-error', t('choose_region_first'));
-            return;
-        }
-        try {
-            hideError('yield-error');
-            const response = await apiFetch(`/api/weather?place=${encodeURIComponent(place)}`);
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || t('weather_lookup_failed'));
-            weatherSequence = result.sequence;
-            const current = weatherSequence[0];
-            document.getElementById('weather-temperature').value = toFourDecimals(current.temperature).toFixed(4);
-            document.getElementById('weather-rainfall').value = toFourDecimals(current.rainfall).toFixed(4);
-            document.getElementById('weather-humidity').value = toFourDecimals(current.humidity).toFixed(4);
-            document.getElementById('weather-soil-moisture').value = toFourDecimals(current.soil_moisture).toFixed(4);
-            weatherSource.textContent = t('weather_loaded', { location: result.location });
-        } catch (error) {
-            showError('yield-error', error.message);
-        }
-    });
-
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         hideError('yield-error');
@@ -209,42 +188,13 @@ const setupYieldPrediction = () => {
         showElement('yield-loading');
 
         try {
-            const rawWeather = {
-                temperature: document.getElementById('weather-temperature').value,
-                rainfall: document.getElementById('weather-rainfall').value,
-                humidity: document.getElementById('weather-humidity').value,
-                soil_moisture: document.getElementById('weather-soil-moisture').value,
-            };
-            if (Object.values(rawWeather).some((value) => value === '')) {
-                throw new Error(t('enter_all_weather'));
-            }
-            const weather = {
-                temperature: Number(rawWeather.temperature),
-                rainfall: Number(rawWeather.rainfall),
-                humidity: Number(rawWeather.humidity),
-                soil_moisture: Number(rawWeather.soil_moisture),
-            };
-            const crop = document.getElementById('yield-crop').value || lastDiseaseResult?.crop || null;
-            const payload = weatherSequence
-                ? { weather_sequence: weatherSequence }
-                : { weather };
-            payload.crop = crop;
-            payload.place = document.getElementById('weather-location').value || null;
-            payload.lang = APP_LANG;
-            if (lastDiseaseResult) {
-                payload.disease = {
-                    crop: lastDiseaseResult.crop,
-                    predicted_class: lastDiseaseResult.predicted_class,
-                    predicted_label: lastDiseaseResult.predicted_label,
-                    confidence: lastDiseaseResult.confidence,
-                    num_classes: lastDiseaseResult.num_classes,
-                };
-            }
+            const place = document.getElementById('yield-location').value;
+            if (!place) throw new Error(t('choose_region_first'));
 
             const response = await apiFetch('/api/predict_yield', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ place }),
             });
             const result = await response.json();
             hideElement('yield-loading');
@@ -257,44 +207,14 @@ const setupYieldPrediction = () => {
     });
 };
 
-const relationshipLabel = (code) => ({
-    aligned: t('relationship_aligned'),
-    weather_only: t('relationship_weather_only'),
-    plant_supports_weather: t('relationship_plant_supports_weather'),
-    disease_reduces_yield: t('relationship_disease_reduces_yield'),
-    weak_shift: t('relationship_weak_shift'),
-    mixed_signals: t('relationship_mixed_signals'),
-}[code] || code);
-
 const displayYieldResult = (result) => {
     lastYieldResult = result;
-    const fused = result.fused_yield ?? result.yield_prediction;
-    const lstm = result.lstm_yield ?? fused;
-    const adjustment = result.adjustment ?? 0;
-    document.getElementById('result-yield').textContent = Number(fused).toFixed(2);
-    document.getElementById('lstm-yield').textContent = `${Number(lstm).toFixed(2)} t/ha`;
-    document.getElementById('yield-adjustment').textContent = `${adjustment > 0 ? '+' : ''}${Number(adjustment).toFixed(2)}`;
-    document.getElementById('yield-trend').textContent = relationshipLabel(result.relationship);
-    document.getElementById('yield-coverage').textContent = result.sequence_length === 12 ? t('coverage_12steps') : t('coverage_manual');
-
-    const plantUsed = result.plant && result.plant.available;
-    let qualityText = plantUsed ? t('buddy_used_both') : t('buddy_weather_only');
-    if (fused >= 6.0) qualityText = `${t('quality_strong')} ${qualityText}`;
-    else if (fused >= 5.0) qualityText = `${t('quality_usable')} ${qualityText}`;
-    else if (fused >= 4.0) qualityText = `${t('quality_moderate')} ${qualityText}`;
-    else qualityText = `${t('quality_low')} ${qualityText}`;
-    document.getElementById('yield-quality').textContent = qualityText;
-
-    const explanation = plantUsed
-        ? t('explanation_full', {
-            lstm: Number(lstm).toFixed(2),
-            fused: Number(fused).toFixed(2),
-            direction: adjustment > 0 ? t('direction_up') : t('direction_down'),
-            delta: Math.abs(adjustment).toFixed(2),
-        })
-        : t('explanation_weather_only', { fused: Number(fused).toFixed(2) });
-    document.getElementById('yield-explanation').textContent = explanation;
-    document.getElementById('yield-bar-fill').style.width = `${Math.min((fused / 7.0) * 100, 100)}%`;
+    document.getElementById('result-yield').textContent = Number(result.yield_prediction).toFixed(2);
+    document.getElementById('yield-explanation').textContent = t('yield_explanation', {
+        place: result.place,
+        years: result.based_on_years,
+        year: result.last_record_year,
+    });
     showElement('yield-result');
 };
 
@@ -308,9 +228,8 @@ const downloadReport = () => {
         rows.push(['Recommendation', lastDiseaseResult.recommendation || '']);
     }
     if (lastYieldResult) {
-        rows.push(['Predicted yield (t/ha)', lastYieldResult.fused_yield]);
-        rows.push(['Weather-only yield (t/ha)', lastYieldResult.lstm_yield]);
-        rows.push(['Relationship', lastYieldResult.relationship]);
+        rows.push(['Rice yield prediction (t/ha)', lastYieldResult.yield_prediction]);
+        rows.push(['Region', lastYieldResult.place]);
     }
     rows.push(['Generated', new Date().toISOString()]);
     const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');

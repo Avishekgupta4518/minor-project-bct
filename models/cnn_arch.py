@@ -19,6 +19,14 @@ class GatekeeperCNN(nn.Module):
             pretrained=False,
             num_classes=num_classes,
         )
+        # The shipped gatekeeper.pth stores its head as classifier.1.*
+        # (nn.Sequential[Dropout, Linear]). Rebuild that exact layout,
+        # otherwise load_state_dict(strict=False) silently drops the trained
+        # classifier weights and leaves a randomly initialized head behind.
+        self.backbone.classifier = nn.Sequential(
+            nn.Dropout(getattr(self.backbone, "drop_rate", 0.2)),
+            nn.Linear(self.backbone.num_features, num_classes),
+        )
 
     def forward(self, x, return_features=False):
         features = self.backbone.forward_features(x)

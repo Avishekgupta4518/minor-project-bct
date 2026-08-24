@@ -8,7 +8,9 @@ from flask import abort, g, jsonify, request, session
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 40
+_RATE_BUCKET_LIMIT = 4096
 _rate_buckets = defaultdict(deque)
+_last_bucket_prune = 0.0
 
 
 def generate_csrf_token():
@@ -47,11 +49,24 @@ def client_key():
     return request.remote_addr or "unknown"
 
 
+def prune_rate_buckets(now):
+    """Drop stale buckets so the in-memory store cannot grow without bound."""
+    global _last_bucket_prune
+    if now - _last_bucket_prune < RATE_LIMIT_WINDOW_SECONDS:
+        return
+    _last_bucket_prune = now
+    if len(_rate_buckets) <= _RATE_BUCKET_LIMIT:
+        return
+    for key in [key for key, bucket in _rate_buckets.items() if not bucket]:
+        del _rate_buckets[key]
+
+
 def rate_limit(max_requests=RATE_LIMIT_MAX_REQUESTS, window_seconds=RATE_LIMIT_WINDOW_SECONDS):
     def decorator(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
             now = time.time()
+            prune_rate_buckets(now)
             bucket = _rate_buckets[f"{view.__name__}:{client_key()}"]
             while bucket and now - bucket[0] > window_seconds:
                 bucket.popleft()

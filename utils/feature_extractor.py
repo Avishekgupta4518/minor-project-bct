@@ -6,9 +6,12 @@ from PIL import Image
 from config import (
     CROP_NAMES,
     DISEASE_CLASS_NAMES,
+    GATEKEEPER_CROP,
+    GATEKEEPER_CLASS_TO_CROP,
     NUM_DISEASE_CLASSES,
     CNN_MODEL_PATHS,
     DEVICE,
+    SPECIES_CROPS,
     get_disease_recommendation,
     get_disease_label_display,
 )
@@ -39,32 +42,76 @@ class FeatureExtractor:
             model = CropCNN(num_classes=NUM_DISEASE_CLASSES[crop_name]).to(DEVICE)
 
         checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=True)
-        model.load_state_dict(checkpoint)
+        load_result = model.load_state_dict(checkpoint, strict=False)
+        missing_weights = [key for key in getattr(load_result, "missing_keys", []) if not key.endswith("num_batches_tracked")]
+        if missing_weights:
+            raise RuntimeError(
+                f"Checkpoint {model_path} is missing weights for {missing_weights}; "
+                f"it does not match the {type(model).__name__} architecture. "
+                "Predictions would be random — refusing to load."
+            )
         model.eval()
         self.models[crop_name] = model
         return model
 
-    def extract_features(self, image_dict):
+    def _prepare_image(self, image):
+        if isinstance(image, str):
+            image = Image.open(image).convert('RGB')
+        return self.transforms(image).unsqueeze(0).to(DEVICE)
+
+    def detect_crop_species(self, image):
         """
-        image_dict: {crop_name: PIL.Image or image path}
-        Returns: tensor of shape (1, num_crops, feature_dim) where feature_dim = 256
+        Run the gatekeeper model to identify which crop species the leaf
+        belongs to. The gatekeeper's 14 output classes are plant species
+        (GATEKEEPER_CLASS_TO_CROP); classes without a disease CNN (squash)
+        are skipped, so the best supported species is returned.
+
+        Returns:
+            dict with predicted crop name, confidence, full probabilities,
+            raw_top_crop and fallback flag
         """
-        feature_list = []
-        for crop in CROP_NAMES:
-            img = image_dict.get(crop)
-            if img is None:
-                feat = torch.zeros(256)  # default zero vector
-            else:
-                model = self._load_model(crop)
-                if isinstance(img, str):
-                    img = Image.open(img).convert('RGB')
-                img_tensor = self.transforms(img).unsqueeze(0).to(DEVICE)
-                with torch.no_grad():
-                    feat = model(img_tensor, return_features=True).squeeze(0).cpu()
-            feature_list.append(feat)
-        # Stack to shape (1, num_crops, 256)
-        features = torch.stack(feature_list).unsqueeze(0)  # (1, 12, 256)
-        return features
+        model = self._load_model(GATEKEEPER_CROP)
+        img_tensor = self._prepare_image(image)
+
+        with torch.no_grad():
+            output = model(img_tensor)
+            probabilities = torch.softmax(output, dim=1)[0]
+
+        probs = probabilities.cpu()
+        class_probs = [
+            (crop_name, float(probs[index]))
+            for index, crop_name in GATEKEEPER_CLASS_TO_CROP.items()
+            if index < len(probs)
+        ]
+        ranked = sorted(class_probs, key=lambda item: item[1], reverse=True)
+        raw_top_crop, _raw_top_conf = ranked[0]
+        supported_ranking = [item for item in ranked if item[0] in SPECIES_CROPS]
+        predicted_crop, confidence = supported_ranking[0]
+        return {
+            'predicted_crop': predicted_crop,
+            'confidence': round(confidence, 4),
+            'probabilities': {crop: round(prob, 4) for crop, prob in class_probs},
+            'raw_top_crop': raw_top_crop,
+            'fallback': raw_top_crop != predicted_crop,
+        }
+
+    def auto_detect_disease(self, image, lang="en"):
+        """
+        Two-stage gatekeeper pipeline:
+          1. GatekeeperCNN classifies the leaf's crop species.
+          2. The matching per-crop CropCNN classifies the disease.
+        """
+        routing = self.detect_crop_species(image)
+        crop_name = routing['predicted_crop']
+        if not crop_name:
+            return {'error': 'Gatekeeper could not identify the crop species.'}
+
+        result = self.detect_disease(crop_name, image, lang=lang)
+        if 'error' in result:
+            return result
+
+        result['gatekeeper'] = routing
+        return result
 
     def detect_disease(self, crop_name, image, lang="en"):
         """
@@ -79,15 +126,13 @@ class FeatureExtractor:
         Returns:
             dict with disease class, confidence score, and class probabilities
         """
+        if crop_name == GATEKEEPER_CROP:
+            return {'error': 'The gatekeeper identifies the crop species only. Use crop "auto" for full disease detection.'}
         if crop_name not in CROP_NAMES:
             return {'error': f'Crop {crop_name} not supported'}
 
         model = self._load_model(crop_name)
-
-        if isinstance(image, str):
-            image = Image.open(image).convert('RGB')
-
-        img_tensor = self.transforms(image).unsqueeze(0).to(DEVICE)
+        img_tensor = self._prepare_image(image)
 
         with torch.no_grad():
             output = model(img_tensor)  # (1, num_classes)

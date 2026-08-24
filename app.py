@@ -1,17 +1,19 @@
 # app.py
 import io
-import json
 import os
 from functools import wraps
 from pathlib import Path
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 from flask import Flask, flash, g, jsonify, redirect, render_template, request, session, url_for
 from PIL import Image
 from werkzeug.utils import secure_filename
 
-from config import AGRICULTURAL_LOCATIONS, CROP_NAMES, DEVICE, WEATHER_SEQUENCE_LENGTH
+from config import (
+    CROP_NAMES,
+    DEVICE,
+    GATEKEEPER_CROP,
+    SPECIES_CROPS,
+)
 from translations import (
     DEFAULT_LANG,
     SUPPORTED_LANGUAGES,
@@ -35,7 +37,7 @@ from utils.database import (
 )
 from utils.feature_extractor import FeatureExtractor
 from utils.security import csrf_protect, generate_csrf_token, rate_limit, validate_image
-from utils.yield_pipeline import YieldPipeline, parse_weather_payload
+from utils.yield_pipeline import RiceYieldPipeline
 
 Image.MAX_IMAGE_PIXELS = 20_000_000
 
@@ -53,8 +55,8 @@ app.config["SESSION_COOKIE_SECURE"] = os.getenv("COOKIE_SECURE", "0") == "1"
 init_database()
 
 feature_extractor = FeatureExtractor()
-yield_pipeline = YieldPipeline()
-yield_model_ready = yield_pipeline.spatial_ready
+yield_pipeline = RiceYieldPipeline()
+yield_model_ready = yield_pipeline.ready
 
 
 @app.before_request
@@ -135,10 +137,10 @@ def role_required(*roles):
 def index():
     return render_template(
         "index.html",
-        crops=CROP_NAMES,
+        crops=SPECIES_CROPS,
+        gatekeeper_crop=GATEKEEPER_CROP,
         yield_model_ready=yield_model_ready,
-        buddy_ready=yield_pipeline.buddy_ready,
-        agricultural_locations=AGRICULTURAL_LOCATIONS,
+        rice_places=yield_pipeline.places,
     )
 
 
@@ -224,7 +226,6 @@ def admin_dashboard():
         predictions_count=count_records("prediction_history"),
         summaries=prediction_summary(),
         yield_model_ready=yield_model_ready,
-        buddy_ready=yield_pipeline.buddy_ready,
     )
 
 
@@ -307,66 +308,8 @@ def health():
     return jsonify({
         "status": "healthy",
         "yield_model_ready": yield_model_ready,
-        "buddy_ready": yield_pipeline.buddy_ready,
         "device": DEVICE,
         "crops": CROP_NAMES,
-    })
-
-
-@app.route("/api/weather", methods=["GET"])
-@rate_limit(20, 60)
-def weather():
-    place_key = request.args.get("place", "").lower()
-    location = AGRICULTURAL_LOCATIONS.get(place_key)
-    if not location:
-        return jsonify({"error": "Choose a supported agricultural region."}), 400
-
-    query = urlencode({
-        "latitude": location["latitude"],
-        "longitude": location["longitude"],
-        "hourly": "temperature_2m,precipitation,relative_humidity_2m",
-        "forecast_days": 2,
-        "timezone": "auto",
-    })
-    url = f"https://api.open-meteo.com/v1/forecast?{query}"
-
-    try:
-        http_request = Request(url, headers={"User-Agent": "SmartMultiCrop/1.0"})
-        with urlopen(http_request, timeout=15) as response:
-            payload = json.load(response)
-    except TimeoutError:
-        app.logger.error("Weather API timeout for %s", place_key)
-        return jsonify({"error": "Weather service timed out. Please try again later."}), 503
-    except OSError:
-        app.logger.error("Weather API connection error for %s", place_key)
-        return jsonify({"error": "Could not connect to weather service. Check your network."}), 503
-    except Exception:
-        app.logger.exception("Unexpected weather lookup failure for %s", place_key)
-        return jsonify({"error": "Weather service is unavailable right now."}), 503
-
-    hourly = payload.get("hourly", {})
-    temp = hourly.get("temperature_2m", [])
-    precip = hourly.get("precipitation", [])
-    humidity = hourly.get("relative_humidity_2m", [])
-
-    if len(temp) < WEATHER_SEQUENCE_LENGTH or len(precip) < WEATHER_SEQUENCE_LENGTH or len(humidity) < WEATHER_SEQUENCE_LENGTH:
-        return jsonify({"error": "Incomplete forecast data from weather service."}), 503
-
-    sequence = []
-    for index in range(WEATHER_SEQUENCE_LENGTH):
-        sequence.append({
-            "temperature": round(float(temp[index]), 2),
-            "rainfall": round(max(0.0, float(precip[index])), 2),
-            "humidity": round(float(humidity[index]), 2),
-            "soil_moisture": round(min(100.0, float(humidity[index]) * 0.55 + float(precip[index]) * 4.0), 2),
-        })
-
-    return jsonify({
-        "sequence": sequence,
-        "source": "Open-Meteo",
-        "location": location["name"],
-        "length": WEATHER_SEQUENCE_LENGTH,
-        "place": place_key,
     })
 
 
@@ -405,21 +348,25 @@ def detect_disease():
             return jsonify({"error": "Missing crop or image data"}), 400
         if crop_name == "other":
             return jsonify({"error": "Other crops are not supported by the trained disease models. Select a listed crop."}), 422
-        if crop_name not in CROP_NAMES:
+        if crop_name not in CROP_NAMES and crop_name != "auto":
             return jsonify({"error": "That crop is not supported."}), 400
         if not isinstance(image_data, str) or len(image_data) > 12_000_000:
             return jsonify({"error": "Image payload is invalid or too large."}), 400
 
         image = decode_image(image_data)
         lang = data.get("lang") if data.get("lang") in SUPPORTED_LANGUAGES else current_lang()
-        result = feature_extractor.detect_disease(crop_name, image, lang=lang)
+        if crop_name == "auto" or crop_name == GATEKEEPER_CROP:
+            result = feature_extractor.auto_detect_disease(image, lang=lang)
+        else:
+            result = feature_extractor.detect_disease(crop_name, image, lang=lang)
         if "error" in result:
             return jsonify(result), 400
 
+        detected_crop = result["crop"]
         store_prediction(
             "disease",
-            {"crop": crop_name},
-            crop=crop_name,
+            {"crop": detected_crop},
+            crop=detected_crop,
             disease_class=result["predicted_class"],
             disease_label=result["predicted_label"],
             confidence=result["confidence"],
@@ -436,63 +383,33 @@ def detect_disease():
 @rate_limit(20, 60)
 def predict_yield():
     if not yield_model_ready:
-        return jsonify({"error": "Yield model checkpoint not found."}), 503
+        return jsonify({"error": "Rice yield model checkpoint not found. Run train_rice_lstm.py."}), 503
 
     try:
         data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "No JSON data"}), 400
 
-        weather_steps = parse_weather_payload(data)
-        crop_name = data.get("crop")
-        if crop_name and crop_name not in CROP_NAMES:
-            return jsonify({"error": "That crop is not supported."}), 400
-        place_key = (data.get("place") or "").lower() or None
-        if place_key and place_key not in AGRICULTURAL_LOCATIONS:
-            return jsonify({"error": "Choose a supported agricultural region."}), 400
+        place = (data.get("place") or "").strip().lower()
+        if not place:
+            return jsonify({"error": "Choose a rice growing region."}), 400
 
-        disease_result = data.get("disease")
-        if disease_result is not None and not isinstance(disease_result, dict):
-            return jsonify({"error": "Disease context must be an object from the plant scan."}), 400
-        if isinstance(disease_result, dict):
-            allowed = {
-                "crop",
-                "predicted_class",
-                "predicted_label",
-                "confidence",
-                "num_classes",
-            }
-            disease_result = {key: disease_result[key] for key in allowed if key in disease_result}
-
-        result = yield_pipeline.predict(
-            weather_steps,
-            crop_name=crop_name,
-            disease_result=disease_result,
-            place_key=place_key,
-        )
+        result = yield_pipeline.predict(place)
         store_prediction(
             "yield",
-            {
-                "weather": weather_steps,
-                "crop": crop_name,
-                "place": place_key,
-                "relationship": result["relationship"],
-            },
-            crop=crop_name,
-            yield_prediction=result["fused_yield"],
-            disease_label=result["relationship"],
-            confidence=result["plant"]["health"] if result["plant"]["available"] else None,
+            {"place": place},
+            crop="rice",
+            yield_prediction=result["yield_prediction"],
         )
-        result["weather_features"] = ["temperature", "rainfall", "humidity", "soil_moisture"]
         return jsonify(result), 200
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception:
         app.logger.exception("Yield prediction failed")
-        return jsonify({"error": "Yield prediction failed. Check the weather values and try again."}), 500
+        return jsonify({"error": "Yield prediction failed. Please try again."}), 500
 
 
 if __name__ == "__main__":
-    host = os.getenv("FLASK_HOST", "0.0.0.0")   # <-- changed here
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", "5000"))
     app.run(debug=False, use_reloader=False, host=host, port=port)
