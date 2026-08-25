@@ -4,6 +4,8 @@
 
 A deep learning-powered web application that identifies plant diseases from leaf images and predicts rice crop yield across Nepali districts, built as a minor project at Purwanchal University.
 
+**Live Demo:** [https://leafdiagnosis.up.railway.app/](https://leafdiagnosis.up.railway.app/)
+
 ---
 
 ## Team Members
