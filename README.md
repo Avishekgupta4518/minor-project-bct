@@ -12,8 +12,8 @@ A deep learning-powered web application that identifies plant diseases from leaf
 |------|---------|--------|
 | Aaditya Kumar Karna | PUR080BCT001 | [github.com/aadityakarna](https://github.com/aadityakarna) |
 | Ankit Kumar Yadav | PUR080BCT016 | [github.com/ankitkumaradav](https://github.com/ankitkumaradav) |
-| Avishek Kumar Gupta | PUR080BCT020 | [github.com/avishekgupta](https://github.com/avishekgupta) |
-| Hariom Raj Chauhan | PUR080BCT033 | [github.com/hariomchauhan](https://github.com/hariomchauhan) |
+| Avishek Kumar Gupta | PUR080BCT020 | [github.com/avishekgupta](https://github.com/Avishekgupta4518) |
+| Hariom Raj Chauhan | PUR080BCT033 | [github.com/hariomchauhan](https://github.com/HariomRajChauhan) |
 
 ---
 
