@@ -17,14 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 COPY . .
 
-RUN mkdir -p data/managed models/managed
+RUN chmod +x entrypoint.sh && \
+    mkdir -p data/managed models/managed
 
 EXPOSE 5000
 
-CMD ["gunicorn", "wsgi:app", \
-     "--bind", "0.0.0.0:5000", \
-     "--workers", "1", \
-     "--threads", "4", \
-     "--timeout", "180", \
-     "--graceful-timeout", "30", \
-     "--access-logfile", "-"]
+ENTRYPOINT ["sh", "entrypoint.sh"]
