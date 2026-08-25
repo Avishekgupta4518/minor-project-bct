@@ -3,32 +3,17 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-*.egg-info/
 
-# Model weights (large binaries — use Git LFS or a release asset instead)
-*.pth
-*.pt
-*.h5
-*.pkl
-
-# Data / generated artifacts
-data/*.db
-data/managed/
-data/images/
-models/managed/
-
-# Environment / secrets
+# Environment
 .env
 .flaskenv
 
-# OS / editor
+# Data (runtime-generated)
+data/managed/
+models/managed/
+
+# OS
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-.cursor/
-
-# Test / coverage
-.pytest_cache/
-htmlcov/
-.coverage
