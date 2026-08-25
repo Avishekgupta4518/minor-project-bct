@@ -1,38 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Admin Monitor - Smart Multi-Crop{% endblock %}
+{% block title %}Admin Monitor - AgriVision AI{% endblock %}
+{% block page_name %}{{ t('nav_admin') }}{% endblock %}
+{% block breadcrumb %}<p class="breadcrumb">{{ t('nav_admin') }} · {{ t('admin_title') }}</p>{% endblock %}
 {% block content %}
-{% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div
-    class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
-<div class="page-heading">
-    <div>
-        <h2>{{ t('admin_title') }}</h2>
-        <p>{{ t('admin_desc') }}</p>
+<div class="page-head">
+    <h2>{{ t('admin_title') }}</h2>
+    <p>{{ t('admin_desc') }}</p>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
+{% endwith %}
+
+<div class="grid-3">
+    <div class="stat-tile"><h3>{{ t('admin_users') }}</h3><strong>{{ users_count }}</strong></div>
+    <div class="stat-tile"><h3>{{ t('admin_predictions') }}</h3><strong>{{ predictions_count }}</strong></div>
+    <div class="stat-tile">
+        <h3>{{ t('admin_yield_model') }}</h3>
+        <strong>
+            {% if yield_model_ready %}
+            <span class="badge success">{{ t('admin_ready') }}</span>
+            {% else %}
+            <span class="badge warning">{{ t('admin_unavailable') }}</span>
+            {% endif %}
+        </strong>
     </div>
 </div>
-<div class="status-grid admin-stats">
-    <div class="status-card">
-        <h3>{{ t('admin_users') }}</h3><strong>{{ users_count }}</strong>
-    </div>
-    <div class="status-card">
-        <h3>{{ t('admin_predictions') }}</h3><strong>{{ predictions_count }}</strong>
-    </div>
-    <div class="status-card">
-        <h3>{{ t('admin_yield_model') }}</h3><strong>{{ t('admin_ready') if yield_model_ready else
-            t('admin_unavailable') }}</strong>
-    </div>
+
+<div class="card admin-actions" style="margin-top:var(--sp-4)">
+    <a class="btn btn-primary btn-sm" href="{{ url_for('manage_dataset') }}">{{ t('btn_manage_dataset') }}</a>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('manage_models') }}">{{ t('btn_manage_models') }}</a>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('analytics') }}">{{ t('btn_view_analytics') }}</a>
 </div>
-<div class="panel admin-actions"><a class="btn btn-secondary" href="{{ url_for('manage_dataset') }}">{{
-        t('btn_manage_dataset') }}</a><a class="btn btn-secondary" href="{{ url_for('manage_models') }}">{{
-        t('btn_manage_models') }}</a><a class="btn btn-secondary" href="{{ url_for('analytics') }}">{{
-        t('btn_view_analytics') }}</a></div>
-<div class="status-grid admin-stats">{% for summary in summaries %}<div class="status-card">
-        <h3>{{ summary['prediction_type']|capitalize }} Results</h3><strong>{{ summary['total'] }}</strong>
-        <p>{% if summary['prediction_type'] == 'yield' %}{{ t('th_average') }}: {{ summary['average_yield']|round(2)
-            }}{% else %}{{ t('th_average_confidence') }}: {{ (summary['average_confidence'] * 100)|round(1) }}%{% endif
-            %}</p>
-    </div>{% endfor %}</div>
-<div class="table-panel panel">
-    <h3>{{ t('registered_users') }}</h3>
+
+{% if summaries %}
+<div class="grid-2" style="margin-top:var(--sp-4)">
+    {% for summary in summaries %}
+    <div class="stat-tile">
+        <h3>{{ summary['prediction_type']|capitalize }} results</h3>
+        <strong>{{ summary['total'] }}</strong>
+        <p>
+            {% if summary['prediction_type'] == 'yield' %}
+                {{ t('th_average') }}: {{ summary['average_yield']|round(2) }} {{ t('unit_tons_hectare_short') }}
+            {% else %}
+                {{ t('th_average_confidence') }}: {{ (summary['average_confidence'] * 100)|round(1) }}%
+            {% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:var(--sp-4)">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-user"/></svg>
+        {{ t('registered_users') }}
+    </div>
     <div class="table-scroll">
         <table>
             <thead>
@@ -44,24 +67,28 @@
                     <th>{{ t('th_manage') }}</th>
                 </tr>
             </thead>
-            <tbody>{% for user in users %}<tr>
-                    <td>{{ user['name'] }}</td>
-                    <td>{{ user['email'] }}</td>
-                    <td>{{ user['role'] }}</td>
-                    <td>{{ user['created_at'] }}</td>
-                    <td>
-                        <form method="post" action="{{ url_for('update_user_role', user_id=user['id']) }}"><input
-                                type="hidden" name="csrf_token" value="{{ csrf_token }}"><select name="role">
-                                <option value="farmer" {% if user['role']=='farmer' %}selected{% endif %}>{{
-                                    t('role_farmer') }}</option>
-                                <option value="analyst" {% if user['role']=='analyst' %}selected{% endif %}>{{
-                                    t('role_analyst') }}</option>
-                                <option value="admin" {% if user['role']=='admin' %}selected{% endif %}>{{
-                                    t('role_admin') }}</option>
-                            </select><button class="btn btn-secondary" type="submit">{{ t('btn_update') }}</button>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td data-label="{{ t('label_name') }}">{{ user['name'] }}</td>
+                    <td data-label="{{ t('label_email') }}">{{ user['email'] }}</td>
+                    <td data-label="{{ t('th_role') }}"><span class="badge neutral">{{ user['role'] }}</span></td>
+                    <td data-label="{{ t('th_created') }}">{{ user['created_at'] }}</td>
+                    <td data-label="{{ t('th_manage') }}">
+                        <form method="post" action="{{ url_for('update_user_role', user_id=user['id']) }}" class="action-bar">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <label for="role-{{ user['id'] }}" class="sr-only">{{ t('th_role') }}</label>
+                            <select id="role-{{ user['id'] }}" name="role" style="width:auto;padding:6px 32px 6px 10px">
+                                <option value="farmer" {% if user['role']=='farmer' %}selected{% endif %}>{{ t('role_farmer') }}</option>
+                                <option value="analyst" {% if user['role']=='analyst' %}selected{% endif %}>{{ t('role_analyst') }}</option>
+                                <option value="admin" {% if user['role']=='admin' %}selected{% endif %}>{{ t('role_admin') }}</option>
+                            </select>
+                            <button class="btn btn-outline btn-sm" type="submit">{{ t('btn_update') }}</button>
                         </form>
                     </td>
-                </tr>{% endfor %}</tbody>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
 </div>

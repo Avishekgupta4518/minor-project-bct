@@ -1,50 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Leaf Scan{% endblock %}
+{% block title %}Dashboard - AgriVision AI{% endblock %}
+{% block page_name %}{{ t('nav_dashboard') }}{% endblock %}
+{% block breadcrumb %}<p class="breadcrumb">{{ t('nav_dashboard') }} · {{ t('hero_headline') }}</p>{% endblock %}
 
 {% block content %}
-<section class="hero">
-    <div>
-        <p class="eyebrow">{{ t('home_eyebrow') }}</p>
-        <h1>{{ t('home_title') }}</h1>
-        <p>{{ t('home_intro') }}</p>
-    </div>
-    <div class="hero-status">
-        <div class="status-card">
-            <span class="badge success">{{ t('status_cnn_ready') }}</span>
-            <h3>{{ t('status_leaf_diagnosis') }}</h3>
-            <p>{{ t('status_trained_crops', count=crops|length) }}</p>
-        </div>
-        <div class="status-card">
-            <span class="badge success">{{ t('status_disease_ready') }}</span>
-            <h3>{{ t('status_disease_title') }}</h3>
-            <p>{{ t('status_disease_desc') }}</p>
-        </div>
-        <div class="status-card">
-            {% if yield_model_ready %}
-                <span class="badge success">{{ t('status_rice_ready') }}</span>
-            {% else %}
-                <span class="badge warning">{{ t('status_rice_missing') }}</span>
-            {% endif %}
-            <h3>{{ t('status_rice_title') }}</h3>
-            <p>{{ t('status_rice_desc') }}</p>
-        </div>
+<div class="page-head">
+    <h2><span id="greet-line"></span></h2>
+    <p>{{ t('dash_subtitle') }} · <span id="today-date" class="muted"></span></p>
+</div>
+
+<section class="hero reveal">
+    <span class="hero-pill">
+        <svg class="icon" style="width:14px;height:14px" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sprout"/></svg>
+        {{ t('home_eyebrow') }}
+    </span>
+    <h2>{{ t('hero_headline') }}</h2>
+    <p>{{ t('hero_sub') }}</p>
+    <div class="hero-actions">
+        <a class="btn btn-hero" href="#disease-panel">
+            <svg class="icon" style="width:16px;height:16px;stroke:#fff" stroke-linecap="round" stroke-linejoin="round"><use href="#i-upload"/></svg>
+            {{ t('cta_detect') }}
+        </a>
+        <a class="btn btn-hero-ghost" href="#yield-panel">
+            <svg class="icon" style="width:16px;height:16px" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg>
+            {{ t('cta_predict') }}
+        </a>
     </div>
 </section>
 
-<div class="workflow">
-    <article>{{ t('workflow_1') }}</article>
-    <article>{{ t('workflow_2') }}</article>
-    <article>{{ t('workflow_3') }}</article>
+<div class="grid-4 reveal">
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-icon"><svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg></span>
+        </div>
+        <span class="kpi-value" id="kpi-scans">0</span>
+        <span class="kpi-label">{{ t('kpi_scans') }}</span>
+        <span class="kpi-sub">{{ t('kpi_local_note') }}</span>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-icon"><svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check-circle"/></svg></span>
+        </div>
+        <span class="kpi-value" id="kpi-healthy">–</span>
+        <span class="kpi-label">{{ t('kpi_healthy') }}</span>
+        <span class="kpi-sub">{{ t('kpi_of_scans') }}</span>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-icon amber"><svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg></span>
+        </div>
+        <span class="kpi-value" id="kpi-diseased">0</span>
+        <span class="kpi-label">{{ t('kpi_diseases') }}</span>
+        <span class="kpi-sub">{{ t('kpi_detected_note') }}</span>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-icon blue"><svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trending"/></svg></span>
+        </div>
+        <span class="kpi-value" id="kpi-yield">–</span>
+        <span class="kpi-label">{{ t('kpi_avg_yield') }}</span>
+        <span class="kpi-sub">{{ t('unit_tons_hectare') }}</span>
+    </div>
 </div>
 
-<div class="panels-grid">
-    <div class="panel disease-panel">
-        <h2>{{ t('leaf_health_title') }}</h2>
-        <p class="panel-description">{{ t('leaf_health_desc') }}</p>
+<div class="card" id="disease-panel" style="margin-top:var(--sp-4)">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
+        {{ t('detect_title') }}
+    </div>
+    <p class="card-sub">{{ t('detect_sub') }}</p>
 
-        <form id="disease-form" class="form-group">
-            <div class="form-control">
+    <div class="grid-2">
+        <form id="disease-form" class="form-grid">
+            <div class="field">
                 <label for="crop-select">{{ t('label_crop') }}</label>
                 <select id="crop-select" name="crop" required title="{{ t('crop_select_title') }}">
                     <option value="auto">{{ t('label_auto_detect') }}</option>
@@ -52,43 +81,96 @@
                         <option value="{{ crop }}">{{ crop_label(crop) }}</option>
                     {% endfor %}
                 </select>
+                <span class="field-error">{{ t('js_choose_crop_and_image') }}</span>
             </div>
 
-            <div class="form-control">
+            <div class="field">
                 <label for="disease-image">{{ t('label_leaf_image') }}</label>
                 <div class="file-input-wrapper">
-                    <input type="file" id="disease-image" name="image" accept="image/jpeg,image/png,image/webp" required>
-                    <label for="disease-image" class="file-label">{{ t('choose_image') }}</label>
+                    <input type="file" id="disease-image" name="image" accept="image/jpeg,image/png,image/webp" required class="hidden-input">
+                    <label for="disease-image" class="dropzone" id="file-drop">
+                        <div class="dz-logo">
+                            <svg class="dz-logo-icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-leaf-upload"/></svg>
+                        </div>
+                        <span class="dz-main" id="drop-text">{{ t('js_drop_hint') }}</span>
+                        <span class="dz-sub">{{ t('choose_image') }}</span>
+                        <span class="dz-formats">
+                            <span class="format-chip">JPG</span>
+                            <span class="format-chip">PNG</span>
+                            <span class="format-chip">WEBP</span>
+                        </span>
+                    </label>
                 </div>
                 <div id="image-preview" class="image-preview"></div>
+                <span class="field-error">{{ t('js_choose_crop_and_image') }}</span>
             </div>
 
-            <button type="submit" class="btn btn-primary">{{ t('btn_scan_leaf') }}</button>
+            <button type="submit" class="btn btn-primary btn-block" id="scan-btn">
+                <span class="spinner" aria-hidden="true"></span>
+                {{ t('btn_analyze_crop') }}
+            </button>
         </form>
 
-        <div id="disease-result" class="result-container hidden">
-            <h3>{{ t('plant_scan_title') }}</h3>
-            <div class="result-content">
-                <p><strong>{{ t('label_crop_result') }}</strong> <span id="result-crop"></span></p>
-                <p id="result-gatekeeper" class="hint hidden"></p>
-                <p><strong>{{ t('label_finding') }}</strong> <span id="result-class"></span></p>
-                <p><strong>{{ t('label_confidence') }}</strong> <span id="result-confidence"></span></p>
-                <p><strong>{{ t('label_recommendation') }}</strong> <span id="result-recommendation"></span></p>
-                <div id="result-probabilities" class="probabilities-chart"></div>
+        <div>
+            <div id="disease-empty" class="empty-state">
+                <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-image"/></svg>
+                <span class="empty-title">{{ t('detect_title') }}</span>
+                <p>{{ t('result_empty_hint') }}</p>
             </div>
+
+            <div id="disease-result" class="result-panel hidden" aria-live="polite">
+                <div class="verdict-head">
+                    <div class="confidence-ring" role="img" aria-label="{{ t('label_confidence') }}">
+                        <svg width="108" height="108" viewBox="0 0 120 120">
+                            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                            <circle class="ring-fg" id="ring-fg" cx="60" cy="60" r="52"/>
+                        </svg>
+                        <span class="ring-label" id="ring-pct">0%</span>
+                    </div>
+                    <div class="verdict-lines">
+                        <span class="v-crop" id="result-crop"></span>
+                        <span class="v-main" id="verdict-main"></span>
+                        <span class="badge neutral" id="result-status">{{ t('status_pending') }}</span>
+                    </div>
+                </div>
+
+                <div class="kv-list">
+                    <div class="row"><span class="k">{{ t('label_crop_result') }}</span><span class="v" style="text-transform:capitalize" id="kv-crop"></span></div>
+                    <div class="row"><span class="k">{{ t('label_confidence') }}</span><span class="v" id="result-confidence"></span></div>
+                    <div class="row"><span class="k">{{ t('model_label') }}</span><span class="v"><span class="badge info">{{ t('model_chip_cnn') }}</span></span></div>
+                    <div class="row"><span class="k">{{ t('label_recommendation') }}</span><span class="v" id="result-recommendation"></span></div>
+                </div>
+
+                <div id="result-gatekeeper" class="note-box gatekeeper hidden">
+                    <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-info"/></svg>
+                    <span id="gatekeeper-text"></span>
+                </div>
+
+                <div id="result-probabilities" class="prob-block"></div>
+
+                <button type="button" id="scan-again" class="btn btn-outline btn-block" style="margin-top:var(--sp-4)">{{ t('js_scan_again') }}</button>
+            </div>
+
+            <div id="disease-error" class="error-box hidden" role="alert">
+                <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg>
+                <span id="disease-error-text"></span>
+            </div>
+            <div id="disease-loading" class="loading-line hidden">{{ t('loading_leaf') }}</div>
         </div>
-
-        <div id="disease-error" class="error-message hidden"></div>
-        <div id="disease-loading" class="loading hidden">{{ t('loading_leaf') }}</div>
     </div>
+</div>
 
-    <div class="panel yield-panel">
-        <h2>{{ t('future_harvest_title') }}</h2>
-        <p class="panel-description">{{ t('future_harvest_desc') }}</p>
+<div class="card" id="yield-panel" style="margin-top:var(--sp-4)">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trending"/></svg>
+        {{ t('yield_page_title') }}
+    </div>
+    <p class="card-sub">{{ t('yield_page_sub') }}</p>
 
-        {% if yield_model_ready %}
-        <form id="yield-form" class="form-group">
-            <div class="form-control">
+    {% if yield_model_ready %}
+    <div class="grid-2">
+        <form id="yield-form" class="form-grid">
+            <div class="field">
                 <label for="yield-location">{{ t('label_yield_place') }}</label>
                 <select id="yield-location" required>
                     <option value="">{{ t('choose_region') }}</option>
@@ -96,52 +178,59 @@
                         <option value="{{ place|lower }}">{{ place }}</option>
                     {% endfor %}
                 </select>
+                <span class="field-error">{{ t('choose_region_first') }}</span>
             </div>
-            <button type="submit" class="btn btn-primary">{{ t('btn_predict_yield') }}</button>
+            <button type="submit" class="btn btn-dark btn-block" id="yield-btn">
+                <span class="spinner" aria-hidden="true"></span>
+                {{ t('btn_predict_yield') }}
+            </button>
+            <p class="muted" style="font-size:.82rem">
+                <svg class="icon" style="width:13px;height:13px;vertical-align:-2px" stroke-linecap="round" stroke-linejoin="round"><use href="#i-info"/></svg>
+                {{ t('yield_input_note') }}
+            </p>
         </form>
 
-        <div id="yield-result" class="result-container hidden">
-            <h3>{{ t('yield_result_title') }}</h3>
-            <div class="result-content">
-                <div class="yield-prediction-box">
-                    <div class="yield-value-display">
-                        <span id="result-yield" class="yield-value">0.0</span>
-                        <span class="yield-unit">{{ t('unit_tons_hectare') }}</span>
+        <div>
+            <div id="yield-empty" class="empty-state">
+                <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg>
+                <span class="empty-title">{{ t('yield_page_title') }}</span>
+                <p>{{ t('yield_empty_hint') }}</p>
+            </div>
+
+            <div id="yield-result" class="result-panel hidden" aria-live="polite">
+                <div class="yield-hero">
+                    <span class="yh-label">{{ t('predicted_yield_label') }}</span>
+                    <div>
+                        <span id="result-yield" class="yh-value">0.00</span>
+                        <span class="yh-unit"> {{ t('unit_tons_hectare') }}</span>
                     </div>
-                    <div class="yield-insights">
-                        <p id="yield-explanation" class="yield-explanation"></p>
-                    </div>
+                    <span class="yield-delta" id="yield-delta"></span>
+                    <p class="yh-note" id="yield-explanation"></p>
+                </div>
+                <div class="trend-wrap">
+                    <canvas id="yield-trend-chart" height="190"></canvas>
                 </div>
             </div>
-        </div>
-        {% else %}
-        <div class="alert alert-warning">
-            <strong>{{ t('lstm_missing_title') }}</strong>
-            <p>{{ t('lstm_missing_body') }}</p>
-        </div>
-        {% endif %}
 
-        <div id="yield-error" class="error-message hidden"></div>
-        <div id="yield-loading" class="loading hidden">{{ t('loading_harvest') }}</div>
-    </div>
-</div>
-
-<div class="panel" style="margin-top:1.25rem;">
-    <button type="button" id="download-report" class="btn btn-secondary">{{ t('btn_download_report') }}</button>
-    <p class="hint">{{ t('download_report_hint') }}</p>
-</div>
-
-<div class="info-panel">
-    <h2>{{ t('how_it_works_title') }}</h2>
-    <div class="info-grid">
-        <div class="info-card">
-            <h4>{{ t('how_cnn_title') }}</h4>
-            <p>{{ t('how_cnn_desc') }}</p>
-        </div>
-        <div class="info-card">
-            <h4>{{ t('how_lstm_title') }}</h4>
-            <p>{{ t('how_lstm_desc') }}</p>
+            <div id="yield-error" class="error-box hidden" role="alert">
+                <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg>
+                <span id="yield-error-text"></span>
+            </div>
+            <div id="yield-loading" class="loading-line hidden">{{ t('loading_harvest') }}</div>
         </div>
     </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <strong>{{ t('lstm_missing_title') }}</strong> — {{ t('lstm_missing_body') }}
+    </div>
+    {% endif %}
+</div>
+
+<div class="card mt-4" style="margin-top:var(--sp-4)">
+    <button type="button" id="download-report" class="btn btn-outline btn-block">
+        <svg class="icon" style="width:16px;height:16px" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg>
+        {{ t('btn_download_report') }}
+    </button>
+    <p class="muted" style="font-size:.82rem;text-align:center;margin-top:var(--sp-2)">{{ t('download_report_hint') }}</p>
 </div>
 {% endblock %}

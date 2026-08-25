@@ -1,7 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Manage Dataset - Smart Multi-Crop{% endblock %}
+{% block title %}Manage Dataset - AgriVision AI{% endblock %}
+{% block page_name %}{{ t('nav_dataset') }}{% endblock %}
+{% block breadcrumb %}<p class="breadcrumb">{{ t('nav_admin') }} · {{ t('dataset_title') }}</p>{% endblock %}
 {% block content %}
-<div class="page-heading"><div><h2>{{ t('dataset_title') }}</h2><p>{{ t('dataset_desc') }}</p></div></div>
-<div class="panel auth-panel"><form method="post" enctype="multipart/form-data" class="form-group"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="form-control"><label for="dataset">{{ t('label_csv_dataset') }}</label><input id="dataset" name="dataset" type="file" accept=".csv" required></div><button class="btn btn-primary" type="submit">{{ t('btn_upload_dataset') }}</button></form></div>
-<div class="table-panel panel"><h3>{{ t('managed_files') }}</h3>{% if files %}<ul>{% for file in files %}<li>{{ file }}</li>{% endfor %}</ul>{% else %}<p class="empty-state">{{ t('no_datasets') }}</p>{% endif %}</div>
+<div class="page-head">
+    <h2>{{ t('dataset_title') }}</h2>
+    <p>{{ t('dataset_desc') }}</p>
+</div>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field">
+            <label for="dataset">{{ t('label_csv_dataset') }}</label>
+            <input id="dataset" name="dataset" type="file" accept=".csv" required>
+        </div>
+        <button class="btn btn-primary" type="submit">{{ t('btn_upload_dataset') }}</button>
+    </form>
+</div>
+
+<div class="card" style="margin-top:var(--sp-4)">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-database"/></svg>
+        {{ t('managed_files') }}
+    </div>
+    {% if files %}
+    <ul class="file-list">
+        {% for file in files %}<li>{{ file }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-database"/></svg>
+        <span class="empty-title">{{ t('dataset_title') }}</span>
+        <p>{{ t('no_datasets') }}</p>
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

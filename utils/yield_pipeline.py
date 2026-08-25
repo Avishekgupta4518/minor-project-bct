@@ -62,6 +62,7 @@ class RiceYieldPipeline:
         clipped = max(0.0, min(1.0, normalized))
         predicted = round(self.yield_min + clipped * (self.yield_max - self.yield_min), 2)
         last_year = rows[-1][0]
+        recent = self.history[key][-10:]
         return {
             "crop": "rice",
             "place": key,
@@ -69,4 +70,11 @@ class RiceYieldPipeline:
             "unit": "t/ha",
             "based_on_years": self.sequence_length,
             "last_record_year": f"{str(last_year)[:4]}/{str(last_year)[4:]}",
+            "recent_history": [
+                {
+                    "year": f"{str(year)[:4]}/{str(year)[4:]}",
+                    "yield_t_ha": value,
+                }
+                for year, value in recent
+            ],
         }

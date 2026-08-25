@@ -4,64 +4,207 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>{% block title %}Leaf Scan{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>{% block title %}AgriVision AI{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2316A34A'/%3E%3Cpath d='M12 19a5 5 0 0 1-.9-9.9C15.1 8.3 16.2 7.9 17.7 6c.7 1.4 1.4 3 1.4 5.7 0 4-3.5 7.3-7.1 7.3Z' fill='%23fff'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260826-dark-v1') }}">
+    <script>
+        (function(){
+            var s;try{s=localStorage.getItem('agrivision_theme')}catch(e){}
+            if(s==='dark')document.documentElement.setAttribute('data-theme','dark');
+            else if(!s&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-theme','dark');
+        })();
+    </script>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <nav class="navbar">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                <span class="brand-mark">LS</span>
-                <span>
-                    <strong>Leaf Scan</strong>
-                    <small>{{ t('brand_tagline') }}</small>
+
+<body data-user="{{ user['name'] if user else '' }}">
+
+<!-- Icon sprite (professional Lucide-style) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></symbol>
+    <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+    <symbol id="i-trending" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-login" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-chevrons-left" viewBox="0 0 24 24"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-leaf-upload" viewBox="0 0 48 48"><path d="M18 6C18 6 12 14 12 24c0 8 5.4 14 12 14s12-6 12-14C36 14 30 6 30 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 36V24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 28l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+</svg>
+
+<div class="shell" id="shell">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+        <div class="sidebar-top">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-logo" aria-hidden="true">
+                    <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sprout"/></svg>
+                </span>
+                <span class="brand-text">
+                    <span class="brand-name">AgriVision AI</span>
+                    <span class="brand-tag">Smart Agriculture</span>
                 </span>
             </a>
-            <button class="nav-toggle" type="button" id="nav-toggle" aria-label="Open menu">{{ t('menu_button') }}</button>
-            <div class="navbar-menu" id="navbar-menu">
-                <a href="{{ url_for('index') }}">{{ t('nav_dashboard') }}</a>
-                {% if user %}<a href="{{ url_for('history') }}">{{ t('nav_history') }}</a>{% endif %}
-                {% if user and user['role'] in ('analyst', 'admin') %}<a href="{{ url_for('analyst_dashboard') }}">{{ t('nav_analyst') }}</a>{% endif %}
-                {% if user and user['role'] == 'admin' %}
-                    <a href="{{ url_for('admin_dashboard') }}">{{ t('nav_admin') }}</a>
-                    <a href="{{ url_for('manage_dataset') }}">{{ t('nav_dataset') }}</a>
-                    <a href="{{ url_for('manage_models') }}">{{ t('nav_models') }}</a>
-                {% endif %}
-                {% if user %}
-                    <a href="{{ url_for('logout') }}">{{ t('nav_sign_out') }}</a>
-                    <span class="user-chip">{{ user['name'] }} · {{ user['role'] }}</span>
-                {% else %}
-                    <a href="{{ url_for('login') }}">{{ t('nav_sign_in') }}</a>
-                {% endif %}
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <span class="nav-section-label">{{ t('nav_section_main') }}</span>
+                <a href="{{ url_for('index') }}" class="{% if request.path == '/' %}active{% endif %}">
+                    <span class="nav-icon-wrap">
+                        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-home"/></svg>
+                    </span>
+                    <span class="nav-label">{{ t('nav_dashboard') }}</span>
+                </a>
+                <a href="{{ url_for('index') }}#disease-panel" class="{% if request.path == '/' and request.args.get('focus') == 'disease' %}active{% endif %}">
+                    <span class="nav-icon-wrap">
+                        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
+                    </span>
+                    <span class="nav-label">{{ t('nav_disease') }}</span>
+                </a>
+                <a href="{{ url_for('index') }}#yield-panel" class="{% if request.path == '/' and request.args.get('focus') == 'yield' %}active{% endif %}">
+                    <span class="nav-icon-wrap">
+                        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trending"/></svg>
+                    </span>
+                    <span class="nav-label">{{ t('nav_yield') }}</span>
+                </a>
+            </div>
+
+            {% if user and user['role'] in ('analyst', 'admin') %}
+            <div class="nav-section">
+                <span class="nav-section-label">{{ t('nav_section_records') }}</span>
+                <a href="{{ url_for('history') }}" class="{% if request.path == '/history' %}active{% endif %}">
+                    <span class="nav-icon-wrap">
+                        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg>
+                    </span>
+                    <span class="nav-label">{{ t('nav_history') }}</span>
+                </a>
+            </div>
+            {% endif %}
+
+            {% if user and user['role'] == 'admin' %}
+            <div class="nav-section">
+                <span class="nav-section-label">{{ t('nav_section_admin') }}</span>
+                <a href="{{ url_for('admin_dashboard') }}" class="{% if request.path == '/admin' %}active{% endif %}">
+                    <span class="nav-icon-wrap">
+                        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-shield"/></svg>
+                    </span>
+                    <span class="nav-label">{{ t('nav_admin') }}</span>
+                </a>
+            </div>
+            {% endif %}
+        </nav>
+
+        {% if user %}
+        <div class="sidebar-user">
+            <div class="sidebar-avatar">{{ user['name'][:1] | upper }}</div>
+            <div class="sidebar-user-meta">
+                <span class="sidebar-user-name">{{ user['name'] }}</span>
+                <span class="sidebar-user-role badge badge-sm">{{ user['role'] }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sidebar-logout" title="{{ t('nav_sign_out') }}">
+                <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-logout"/></svg>
+            </a>
+        </div>
+        {% else %}
+        <div class="sidebar-user">
+            <a href="{{ url_for('login') }}" class="sidebar-login-link">
+                <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-login"/></svg>
+                <span class="nav-label">{{ t('nav_sign_in') }}</span>
+            </a>
+        </div>
+        {% endif %}
+
+        <button class="sidebar-collapse-btn" id="collapse-btn" type="button" title="{{ t('collapse_sidebar') }}" aria-label="{{ t('collapse_sidebar') }}">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevrons-left"/></svg>
+            <span class="chev-label">{{ t('collapse_sidebar') }}</span>
+        </button>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <div class="main-wrap">
+        <header class="header">
+            <button class="hamburger" type="button" id="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="sidebar">
+                <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-menu"/></svg>
+            </button>
+            <div class="header-title">
+                <h1 class="header-heading">{% block page_name %}{{ t('nav_dashboard') }}{% endblock %}</h1>
+                {% block breadcrumb %}<p class="breadcrumb">AgriVision AI · Dashboard</p>{% endblock %}
+            </div>
+            <div class="header-actions">
+                <span class="health-chip" id="health-chip" role="status" title="API status">
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="chip-text" id="health-text">{{ t('js_status_online') }}</span>
+                </span>
+                <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle theme">
+                    <svg class="icon icon-sun" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun"/></svg>
+                    <svg class="icon icon-moon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
+                </button>
                 <span class="lang-switch">
+                    <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-globe"/></svg>
                     {% for code in supported_languages %}
                         {% if code == lang %}
                             <strong>{{ language_labels[code] }}</strong>
                         {% else %}
                             <a href="{{ url_for('set_language', lang_code=code) }}">{{ language_labels[code] }}</a>
                         {% endif %}
-                        {% if not loop.last %} · {% endif %}
+                        {% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}
                     {% endfor %}
                 </span>
-                <span class="status-indicator" id="health-status" title="API status">●</span>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+        <main class="main">
+            {% block content %}{% endblock %}
+        </main>
 
-    <footer>
-        <p>{{ t('footer_note') }}</p>
-    </footer>
+        <footer class="footer">{{ t('footer_note') }}</footer>
+    </div>
+</div>
 
-    <script>
-        window.APP_LANG = {{ lang | tojson }};
-        window.APP_I18N = {{ js_i18n | tojson }};
-    </script>
-    <script src="{{ url_for('static', filename='js/app.js', v='20260824-rice-v1') }}"></script>
-    {% block extra_js %}{% endblock %}
+<nav class="bottom-nav" aria-label="Main navigation">
+    <a href="{{ url_for('index') }}" class="{% if request.path == '/' %}active{% endif %}" aria-label="{{ t('nav_dashboard') }}">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-home"/></svg>
+        Dashboard
+    </a>
+    <a href="{{ url_for('index') }}#disease-panel" aria-label="{{ t('nav_disease') }}">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
+        Disease
+    </a>
+    <a href="{{ url_for('index') }}#yield-panel" aria-label="{{ t('nav_yield') }}">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trending"/></svg>
+        Yield
+    </a>
+</nav>
+
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+<script>
+    window.APP_LANG = {{ lang | tojson }};
+    window.APP_I18N = {{ js_i18n | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/app.js', v='20260824-pro-v1') }}"></script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

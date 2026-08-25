@@ -1,34 +1,88 @@
 {% extends "base.html" %}
-{% block title %}Prediction History - Smart Multi-Crop{% endblock %}
+{% block title %}Prediction History - AgriVision AI{% endblock %}
+{% block page_name %}{{ t('nav_history') }}{% endblock %}
+{% block breadcrumb %}<p class="breadcrumb">{{ t('nav_history') }} · {{ t('history_title') }}</p>{% endblock %}
 {% block content %}
-<div class="page-heading"><div><h2>{{ t('history_title') }}</h2><p>{{ t('history_desc') }}</p></div></div>
+<div class="page-head">
+    <h2>{{ t('history_title') }}</h2>
+    <p>{{ t('history_desc') }}</p>
+</div>
 
 {% if yield_trend %}
-<div class="panel" style="margin-bottom:1.25rem;">
-    <h3>{{ t('yield_trend_title') }}</h3>
+<div class="card">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trending"/></svg>
+        {{ t('yield_trend_title') }}
+    </div>
     <canvas id="yield-trend-chart" height="90"></canvas>
 </div>
 {% endif %}
 
 {% if disease_counts %}
-<div class="panel" style="margin-bottom:1.25rem;">
-    <h3>{{ t('disease_scans_title') }}</h3>
+<div class="card" style="margin-top:var(--sp-4)">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
+        {{ t('disease_scans_title') }}
+    </div>
     <canvas id="disease-count-chart" height="90"></canvas>
 </div>
 {% endif %}
 
-<div class="table-panel panel">
+<div class="card" style="margin-top:var(--sp-4)">
     {% if records %}
-    <div class="table-scroll"><table><thead><tr><th>{{ t('th_date') }}</th><th>{{ t('th_type') }}</th><th>{{ t('th_crop') }}</th><th>{{ t('th_result') }}</th><th>{{ t('th_confidence') }}</th><th>{{ t('th_user') }}</th></tr></thead><tbody>
-    {% for record in records %}<tr><td>{{ record['created_at'] }}</td><td>{{ record['prediction_type']|capitalize }}</td><td>{{ crop_label(record['crop']) if record['crop'] else '-' }}</td><td>{% if record['prediction_type'] == 'yield' %}{{ record['yield_prediction'] }} {{ t('unit_tons_hectare_short') }}{% else %}{{ record['disease_label'] or ('Class ' ~ record['disease_class']) }}{% endif %}</td><td>{% if record['confidence'] is not none %}{{ (record['confidence'] * 100)|round(1) }}%{% else %}-{% endif %}</td><td>{{ record['name'] or t('guest') }}</td></tr>{% endfor %}
-    </tbody></table></div>
-    {% else %}<p class="empty-state">{{ t('no_history') }}</p>{% endif %}
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg>
+        {{ t('history_title') }}
+    </div>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ t('th_date') }}</th>
+                    <th>{{ t('th_type') }}</th>
+                    <th>{{ t('th_crop') }}</th>
+                    <th>{{ t('th_result') }}</th>
+                    <th>{{ t('th_confidence') }}</th>
+                    <th>{{ t('th_user') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td data-label="{{ t('th_date') }}">{{ record['created_at'] }}</td>
+                    <td data-label="{{ t('th_type') }}"><span class="badge neutral">{{ record['prediction_type']|capitalize }}</span></td>
+                    <td data-label="{{ t('th_crop') }}">{{ crop_label(record['crop']) if record['crop'] else '-' }}</td>
+                    <td data-label="{{ t('th_result') }}">
+                        {% if record['prediction_type'] == 'yield' %}
+                            {{ record['yield_prediction'] }} {{ t('unit_tons_hectare_short') }}
+                        {% else %}
+                            {{ record['disease_label'] or ('Class ' ~ record['disease_class']) }}
+                        {% endif %}
+                    </td>
+                    <td data-label="{{ t('th_confidence') }}">
+                        {% if record['confidence'] is not none %}
+                            <span class="badge {{ 'success' if record['confidence'] >= 0.8 else 'warning' }}">{{ (record['confidence'] * 100)|round(1) }}%</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td data-label="{{ t('th_user') }}">{{ record['name'] or t('guest') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg>
+        <span class="empty-title">{{ t('history_title') }}</span>
+        <p>{{ t('no_history') }}</p>
+    </div>
+    {% endif %}
 </div>
 
 {% if yield_trend or disease_counts %}
 <script id="yield-trend-data" type="application/json">{{ {"trend": yield_trend} | tojson }}</script>
 <script id="disease-count-data" type="application/json">{{ {"counts": disease_counts} | tojson }}</script>
-<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js', v='20260824-agrivision-v1') }}"></script>
+<script src="{{ url_for('static', filename='js/history.js', v='20260824-agrivision-v1') }}"></script>
 {% endif %}
 {% endblock %}

@@ -140,7 +140,7 @@ def index():
         crops=SPECIES_CROPS,
         gatekeeper_crop=GATEKEEPER_CROP,
         yield_model_ready=yield_model_ready,
-        rice_places=yield_pipeline.places,
+        rice_places=yield_pipeline.places if yield_model_ready else [],
     )
 
 
@@ -300,7 +300,26 @@ def update_user_role(user_id):
 @app.route("/analyst")
 @role_required("analyst", "admin")
 def analyst_dashboard():
-    return render_template("history.html", records=list_predictions(), analyst_view=True)
+    records = list_predictions()
+
+    yield_trend = [
+        {"date": r["created_at"], "yield": r["yield_prediction"]}
+        for r in records
+        if r["prediction_type"] == "yield" and r["yield_prediction"] is not None
+    ][::-1]
+
+    disease_counts = {}
+    for r in records:
+        if r["prediction_type"] == "disease":
+            crop = r["crop"] or "unknown"
+            disease_counts[crop] = disease_counts.get(crop, 0) + 1
+
+    return render_template(
+        "history.html",
+        records=records,
+        yield_trend=yield_trend,
+        disease_counts=disease_counts,
+    )
 
 
 @app.route("/api/health", methods=["GET"])
@@ -330,7 +349,10 @@ def decode_image(image_data):
 
 
 def store_prediction(prediction_type, input_data, **fields):
-    user = current_user()
+    try:
+        user = current_user()
+    except Exception:
+        user = None
     add_prediction(user["id"] if user else None, prediction_type, input_data, **fields)
 
 
@@ -412,4 +434,4 @@ def predict_yield():
 if __name__ == "__main__":
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", "5000"))
-    app.run(debug=False, use_reloader=False, host=host, port=port)
+    app.run(debug=True, use_reloader=True, host=host, port=port)

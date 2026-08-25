@@ -1,22 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Manage AI Models - Smart Multi-Crop{% endblock %}
+{% block title %}Manage AI Models - AgriVision AI{% endblock %}
+{% block page_name %}{{ t('nav_models') }}{% endblock %}
+{% block breadcrumb %}<p class="breadcrumb">{{ t('nav_admin') }} · {{ t('models_title') }}</p>{% endblock %}
 {% block content %}
-<div class="page-heading">
-    <div>
-        <h2>{{ t('models_title') }}</h2>
-        <p>{{ t('models_desc') }}</p>
-    </div>
+<div class="page-head">
+    <h2>{{ t('models_title') }}</h2>
+    <p>{{ t('models_desc') }}</p>
 </div>
-<div class="panel auth-panel">
-    <form method="post" enctype="multipart/form-data" class="form-group"><input type="hidden" name="csrf_token"
-            value="{{ csrf_token }}">
-        <div class="form-control"><label for="model">{{ t('label_pytorch_model') }}</label><input id="model"
-                name="model" type="file" accept=".pth,.pt" required></div><button class="btn btn-primary"
-            type="submit">{{ t('btn_upload_model') }}</button>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field">
+            <label for="model">{{ t('label_pytorch_model') }}</label>
+            <input id="model" name="model" type="file" accept=".pth,.pt" required>
+        </div>
+        <button class="btn btn-primary" type="submit">{{ t('btn_upload_model') }}</button>
     </form>
 </div>
-<div class="table-panel panel">
-    <h3>{{ t('managed_files') }}</h3>{% if files %}<ul>{% for file in files %}<li>{{ file }}</li>{% endfor %}</ul>{%
-    else %}<p class="empty-state">{{ t('no_models') }}</p>{% endif %}
+
+<div class="card" style="margin-top:var(--sp-4)">
+    <div class="card-title">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cpu"/></svg>
+        {{ t('managed_files') }}
+    </div>
+    {% if files %}
+    <ul class="file-list">
+        {% for file in files %}<li>{{ file }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <svg class="icon" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cpu"/></svg>
+        <span class="empty-title">{{ t('models_title') }}</span>
+        <p>{{ t('no_models') }}</p>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

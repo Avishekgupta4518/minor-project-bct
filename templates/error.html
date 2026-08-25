@@ -1,3 +1,15 @@
 {% extends "base.html" %}
-{% block title %}{{ code }} - Smart Multi-Crop{% endblock %}
-{% block content %}<div class="panel empty-state"><h2>{{ code }}</h2><p>{{ message }}</p><a class="btn btn-primary" href="{{ url_for('index') }}">{{ t('error_back_dashboard') }}</a></div>{% endblock %}
+{% block title %}{{ code }} - AgriVision AI{% endblock %}
+{% block page_name %}{{ t('error_page') }}{% endblock %}
+{% block content %}
+<div class="auth-shell">
+    <div class="card auth-card" style="text-align:center">
+        <div class="empty-state">
+            <svg class="icon" style="width:56px;height:56px" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg>
+            <h2 style="font-size:2rem;font-weight:800;margin:var(--sp-3) 0 var(--sp-1)">{{ code }}</h2>
+            <p>{{ message }}</p>
+        </div>
+        <a class="btn btn-primary btn-block" href="{{ url_for('index') }}" style="margin-top:var(--sp-4)">{{ t('error_back_dashboard') }}</a>
+    </div>
+</div>
+{% endblock %}

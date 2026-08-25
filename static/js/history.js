@@ -1,5 +1,7 @@
 // static/js/history.js — renders history-page charts from embedded JSON payloads.
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof Chart === 'undefined') return;
+
     const readJson = (id) => {
         const el = document.getElementById(id);
         if (!el) return null;
@@ -15,9 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Predicted yield (t/ha)',
                     data: yieldPayload.trend.map((item) => item.yield),
-                    borderColor: '#2f6b45',
-                    backgroundColor: 'rgba(47,107,69,0.12)',
-                    tension: 0.25,
+                    borderColor: '#16A34A',
+                    backgroundColor: 'rgba(22,163,74,0.10)',
+                    tension: 0.35,
                     fill: true,
                 }]
             },
@@ -34,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Scans',
                     data: Object.values(diseasePayload.counts),
-                    backgroundColor: '#c47b2b',
+                    backgroundColor: '#16A34A',
                 }]
             },
             options: { responsive: true, plugins: { legend: { display: false } } }
