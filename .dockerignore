@@ -1,0 +1,17 @@
+.venv/
+venv/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
+.idea/
+.cursor/
+.env
+.flaskenv
+tests/
+test_app.py
+.dockerignore
+data/managed/
+models/managed/
